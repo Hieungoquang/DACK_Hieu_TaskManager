@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "291381323204",
+    "project_id": "hieu-taskmanager",
+    "storage_bucket": "hieu-taskmanager.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:291381323204:android:0c4c277c75acca96943091",
+        "android_client_info": {
+          "package_name": "com.example.task_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-wzRzRIygZfH-r-WMLZa45BG06BoJD3U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
