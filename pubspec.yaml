@@ -20,6 +20,11 @@ version: 1.0.0+1
 
 environment:
   sdk: ^3.11.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  cloud_firestore: ^4.15.0
+  firebase_core: ^2.30.0
+  connectivity_plus: ^5.0.2
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -31,27 +36,9 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # State management
-  provider: ^6.0.5
-
-  # Hive (database offline)
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-
-  # Code generator
-  build_runner: ^2.4.8
-  hive_generator: ^2.0.1
-
-  # Optional (network check)
-  connectivity_plus: ^5.0.2
-
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-
-  firebase_core: ^2.25.0
-  firebase_auth: ^4.17.4
-  cloud_firestore: ^4.15.8
 
 dev_dependencies:
   flutter_test:
