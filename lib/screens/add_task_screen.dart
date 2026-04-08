@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
-class AddTaskScreen extends StatelessWidget {
+class AddTaskScreen extends StatefulWidget {
+  @override
+  _AddTaskScreenState createState() => _AddTaskScreenState();
+}
+
+class _AddTaskScreenState extends State<AddTaskScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -16,7 +21,9 @@ class AddTaskScreen extends StatelessWidget {
 
             DropdownButtonFormField(
               items: ["1", "2", "3"]
-                  .map((e) => DropdownMenuItem(value: e, child: Text("Item $e")))
+                  .map(
+                    (e) => DropdownMenuItem(value: e, child: Text("Item $e")),
+                  )
                   .toList(),
               onChanged: (value) {},
               decoration: InputDecoration(labelText: "Độ ưu tiên"),

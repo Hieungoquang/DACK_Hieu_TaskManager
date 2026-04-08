@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
-class ScheduleScreen extends StatelessWidget {
+class ScheduleScreen extends StatefulWidget {
+  @override
+  _ScheduleScreenState createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -28,7 +33,7 @@ class ScheduleScreen extends StatelessWidget {
                   return ListTile(title: Text("Task $index"));
                 },
               ),
-            )
+            ),
           ],
         ),
       ),

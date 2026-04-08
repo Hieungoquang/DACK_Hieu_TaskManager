@@ -1,11 +1,36 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import 'login_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final AuthService _auth = AuthService();
   final List<String> tasks = List.generate(10, (index) => "Item $index");
+
+  void logout() async {
+    await _auth.logout();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => LoginScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text("Task Manager"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: logout,
+          ),
+        ],
+      ),
       backgroundColor: Colors.grey[200],
       body: SafeArea(
         child: Padding(
@@ -13,7 +38,6 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // 🔹 HEADER
               Container(
                 padding: EdgeInsets.all(12),
@@ -27,9 +51,13 @@ class HomeScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text("Xin chào", style: TextStyle(fontSize: 14)),
-                    Text("Hiếu",
-                        style: TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text(
+                      "Hiếu",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -55,7 +83,8 @@ class HomeScreen extends StatelessWidget {
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
 
@@ -76,8 +105,10 @@ class HomeScreen extends StatelessWidget {
 
               SizedBox(height: 12),
 
-              Text("Danh sách công việc",
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                "Danh sách công việc",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
 
               SizedBox(height: 10),
 
@@ -122,8 +153,10 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text(title),
             SizedBox(height: 5),
-            Text(value,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),
@@ -137,8 +170,9 @@ class HomeScreen extends StatelessWidget {
         onPressed: () {},
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
         child: Text(text),
       ),

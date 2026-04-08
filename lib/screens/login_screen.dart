@@ -1,64 +1,153 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import 'register_screen.dart';
+import 'home_screen.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final AuthService _auth = AuthService();
+
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  bool isLoading = false;
+
+  void login() async {
+    print("🔥 CLICK LOGIN");
+
+    if (!_formKey.currentState!.validate()) {
+      print("❌ FORM INVALID");
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    String? error = await _auth.login(
+      emailController.text.trim(),
+      passwordController.text.trim(),
+    );
+
+    setState(() => isLoading = false);
+
+    if (error == null) {
+      print("✅ LOGIN SUCCESS");
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen()),
+      );
+    } else {
+      print("❌ ERROR: $error");
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, size: 80, color: Colors.redAccent),
-            SizedBox(height: 10),
-            Text("TaskFlow", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      resizeToAvoidBottomInset: true, // 👈 fix bàn phím che UI
 
-            SizedBox(height: 20),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          // 👈 FIX KHÔNG CLICK
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  SizedBox(height: 80),
 
-            TextField(
-              decoration: InputDecoration(
-                hintText: "Email",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  Text(
+                    "Đăng nhập",
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  ),
+
+                  SizedBox(height: 30),
+
+                  // EMAIL
+                  TextFormField(
+                    controller: emailController,
+                    decoration: InputDecoration(
+                      labelText: "Email",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return "Không được để trống email";
+                      }
+                      if (!value.contains("@")) {
+                        return "Email không hợp lệ";
+                      }
+                      return null;
+                    },
+                  ),
+
+                  SizedBox(height: 15),
+
+                  // PASSWORD
+                  TextFormField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: "Mật khẩu",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return "Không được để trống mật khẩu";
+                      }
+                      if (value.length < 6) {
+                        return "Mật khẩu phải >= 6 ký tự";
+                      }
+                      return null;
+                    },
+                  ),
+
+                  SizedBox(height: 25),
+
+                  // BUTTON LOGIN
+                  isLoading
+                      ? CircularProgressIndicator()
+                      : SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: login,
+                            child: Text("Đăng nhập"),
+                          ),
+                        ),
+
+                  SizedBox(height: 10),
+
+                  // REGISTER
+                  TextButton(
+                    onPressed: () {
+                      print("👉 CLICK REGISTER");
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => RegisterScreen()),
+                      );
+                    },
+                    child: Text("Chưa có tài khoản? Đăng ký"),
+                  ),
+                ],
               ),
             ),
-
-            SizedBox(height: 10),
-
-            TextField(
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: "Mật khẩu",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-
-            SizedBox(height: 20),
-
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                minimumSize: Size(double.infinity, 50),
-              ),
-              onPressed: () {},
-              child: Text("Đăng nhập"),
-            ),
-
-            SizedBox(height: 10),
-
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                minimumSize: Size(double.infinity, 50),
-              ),
-              onPressed: () {},
-              child: Text("Đăng nhập với Google"),
-            ),
-
-            TextButton(
-              onPressed: () {},
-              child: Text("Chưa có tài khoản? Đăng ký"),
-            )
-          ],
+          ),
         ),
       ),
     );
