@@ -23,14 +23,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final List<Map<String, dynamic>> comments = [];
   final TextEditingController _commentController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  bool _previewDescription = false;
   bool _previewComment = false;
+  bool _previewDescription = false;
 
-  final Color bgColor = const Color(0xFFF7F8FC);
-  final Color cardColor = Colors.white;
-  final Color textColor = const Color(0xFF1F2937);
-  final Color secondaryText = const Color(0xFF6B7280);
-  final Color borderColor = const Color(0xFFE5E7EB);
+  // GitHub Style Colors
+  static const Color ghDarkBg = Color(0xFF0D1117);
+  static const Color ghLightBg = Color(0xFFF6F8FA);
+  static const Color ghDarkCard = Color(0xFF161B22);
+  static const Color ghLightCard = Color(0xFFFFFFFF);
+  static const Color ghDarkBorder = Color(0xFF30363D);
+  static const Color ghLightBorder = Color(0xFFD0D7DE);
+  static const Color ghDarkText = Color(0xFFC9D1D9);
+  static const Color ghLightText = Color(0xFF24292F);
+  static const Color ghDarkSubText = Color(0xFF8B949E);
+  static const Color ghLightSubText = Color(0xFF57606A);
+
+  Color bgColor = ghLightBg;
+  Color cardColor = ghLightCard;
+  Color textColor = ghLightText;
+  Color secondaryText = ghLightSubText;
+  Color borderColor = ghLightBorder;
 
   @override
   void initState() {
@@ -135,13 +147,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           "Chọn nhãn",
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: categories
               .map((cat) => ListTile(
-                    title: Text(cat, style: GoogleFonts.inter()),
+                    title: Text(cat, style: GoogleFonts.nunito()),
                     onTap: () => Navigator.pop(context, cat),
                   ))
               .toList(),
@@ -169,11 +181,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           "Xóa công việc",
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
         ),
         content: Text(
           "Bạn có chắc muốn xóa công việc này?",
-          style: GoogleFonts.inter(),
+          style: GoogleFonts.nunito(),
         ),
         actions: [
           TextButton(
@@ -211,7 +223,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           "Chỉnh sửa nhiệm vụ",
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -267,12 +279,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       widget.task.updatedAt = DateTime.now();
     });
     await widget.task.save();
+    if (!mounted) return;
+    final provider = Provider.of<TaskProvider>(context, listen: false);
+    await provider.updateTask(widget.task);
     if (mounted) {
       final statusText = status == 'completed'
           ? 'hoàn thành'
           : status == 'in_progress'
               ? 'đang làm'
-              : 'mở lại';
+              : status == 'pending'
+                  ? 'cần làm'
+                  : 'mở lại';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Nhiệm vụ đã chuyển sang $statusText')),
       );
@@ -321,7 +338,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         const SizedBox(width: 10),
         Text(
           "$title:",
-          style: GoogleFonts.inter(
+          style: GoogleFonts.nunito(
             fontWeight: FontWeight.w600,
             color: secondaryText,
           ),
@@ -329,7 +346,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         const SizedBox(width: 6),
         Text(
           value,
-          style: GoogleFonts.inter(
+          style: GoogleFonts.nunito(
             fontWeight: FontWeight.w600,
             color: textColor,
           ),
@@ -341,7 +358,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget sectionTitle(String title) {
     return Text(
       title,
-      style: GoogleFonts.inter(
+      style: GoogleFonts.nunito(
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: textColor,
@@ -365,7 +382,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.inter(color: secondaryText, fontSize: 14),
+              style: GoogleFonts.nunito(color: secondaryText, fontSize: 14),
             ),
           ),
         ],
@@ -375,18 +392,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Widget _buildMetaChip(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
-        style: GoogleFonts.inter(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+        style: GoogleFonts.nunito(
           color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
         ),
       ),
     );
@@ -430,7 +447,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ),
                         child: Text(
                           "Viết",
-                          style: GoogleFonts.inter(
+                          style: GoogleFonts.nunito(
                             fontWeight: FontWeight.w700,
                             color: textColor,
                           ),
@@ -446,7 +463,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ),
                         child: Text(
                           "Xem trước",
-                          style: GoogleFonts.inter(color: textColor),
+                          style: GoogleFonts.nunito(color: textColor),
                         ),
                       ),
                     ),
@@ -467,7 +484,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                   ? "Chưa có mô tả."
                                   : _descriptionController.text,
                               softWrap: true,
-                              style: GoogleFonts.inter(
+                              style: GoogleFonts.nunito(
                                 fontSize: 14,
                                 color: textColor,
                               ),
@@ -481,7 +498,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           textAlignVertical: TextAlignVertical.top,
                           decoration: InputDecoration(
                             hintText: "Nhập mô tả của bạn tại đây...",
-                            hintStyle: GoogleFonts.inter(color: secondaryText),
+                            hintStyle: GoogleFonts.nunito(color: secondaryText),
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.all(16),
                           ),
@@ -511,7 +528,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             const SizedBox(width: 8),
                             Text(
                               "Chọn tệp đính kèm",
-                              style: GoogleFonts.inter(color: secondaryText),
+                              style: GoogleFonts.nunito(color: secondaryText),
                             ),
                           ],
                         ),
@@ -617,7 +634,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           file,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(fontSize: 13),
+                          style: GoogleFonts.nunito(fontSize: 13),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -655,7 +672,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       const SizedBox(width: 6),
                       Text(
                         "Đính kèm",
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -688,7 +705,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   children: [
                     Text(
                       "Bạn đã ghi chú vào ${DateFormat('dd/MM/yyyy').format(comment['date'] as DateTime)}",
-                      style: GoogleFonts.inter(
+                      style: GoogleFonts.nunito(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                         color: textColor,
@@ -709,7 +726,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                   child: Text(
                     comment['text'] as String,
-                    style: GoogleFonts.inter(fontSize: 14, color: textColor),
+                    style: GoogleFonts.nunito(fontSize: 14, color: textColor),
                   ),
                 ),
               ],
@@ -770,7 +787,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ),
                         child: Text(
                           "Viết",
-                          style: GoogleFonts.inter(
+                          style: GoogleFonts.nunito(
                             fontWeight: FontWeight.w700,
                             color: textColor,
                           ),
@@ -786,7 +803,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ),
                         child: Text(
                           "Xem trước",
-                          style: GoogleFonts.inter(color: textColor),
+                          style: GoogleFonts.nunito(color: textColor),
                         ),
                       ),
                     ),
@@ -807,7 +824,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                   ? "Chưa có nội dung ghi chú."
                                   : _commentController.text,
                               softWrap: true,
-                              style: GoogleFonts.inter(
+                              style: GoogleFonts.nunito(
                                 fontSize: 14,
                                 color: textColor,
                               ),
@@ -821,7 +838,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           textAlignVertical: TextAlignVertical.top,
                           decoration: InputDecoration(
                             hintText: "Thêm ghi chú...",
-                            hintStyle: GoogleFonts.inter(color: secondaryText),
+                            hintStyle: GoogleFonts.nunito(color: secondaryText),
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.all(14),
                           ),
@@ -850,7 +867,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
                 child: Text(
                   "Ghi chú",
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -889,47 +906,88 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         /// Status
         sectionTitle("Trạng thái"),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            _buildMetaChip(
-              widget.task.status == 'in_progress'
-                  ? 'Đang làm'
-                  : widget.task.status == 'completed'
-                      ? 'Hoàn thành'
-                      : 'Mở lại',
-              widget.task.status == 'in_progress'
-                  ? Colors.orange
-                  : widget.task.status == 'completed'
-                      ? Colors.green
-                      : Colors.blue,
+        PopupMenuButton<String>(
+          initialValue: widget.task.status,
+          onSelected: (value) {
+            _setTaskStatus(value);
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'pending',
+              child: Text('Cần làm'),
             ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {
-                showMenu(
-                  context: context,
-                  position: const RelativeRect.fromLTRB(0, 0, 0, 0),
-                  items: [
-                    const PopupMenuItem(
-                      value: 'pending',
-                      child: Text('Mở lại'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'in_progress',
-                      child: Text('Đang làm'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'completed',
-                      child: Text('Hoàn thành'),
-                    ),
-                  ],
-                ).then((value) {
-                  if (value != null) _setTaskStatus(value);
-                });
-              },
-              child: Icon(Icons.edit, size: 14, color: Colors.blue.shade600),
+            const PopupMenuItem(
+              value: 'in_progress',
+              child: Text('Đang làm'),
+            ),
+            const PopupMenuItem(
+              value: 'completed',
+              child: Text('Hoàn thành'),
+            ),
+            const PopupMenuItem(
+              value: 'reopen',
+              child: Text('Mở lại'),
             ),
           ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: widget.task.status == 'in_progress'
+                  ? Colors.orange.withValues(alpha: 0.1)
+                  : widget.task.status == 'completed'
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : widget.task.status == 'reopen'
+                          ? Colors.grey.withValues(alpha: 0.1)
+                          : Colors.blue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: widget.task.status == 'in_progress'
+                    ? Colors.orange.withValues(alpha: 0.3)
+                    : widget.task.status == 'completed'
+                        ? Colors.green.withValues(alpha: 0.3)
+                        : widget.task.status == 'reopen'
+                            ? Colors.grey.withValues(alpha: 0.3)
+                            : Colors.blue.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.task.status == 'in_progress'
+                      ? 'Đang làm'
+                      : widget.task.status == 'completed'
+                          ? 'Hoàn thành'
+                          : widget.task.status == 'reopen'
+                              ? 'Mở lại'
+                              : 'Cần làm',
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: widget.task.status == 'in_progress'
+                        ? Colors.orange
+                        : widget.task.status == 'completed'
+                            ? Colors.green
+                            : widget.task.status == 'reopen'
+                                ? Colors.grey
+                                : Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_drop_down,
+                  size: 20,
+                  color: widget.task.status == 'in_progress'
+                      ? Colors.orange
+                      : widget.task.status == 'completed'
+                          ? Colors.green
+                          : widget.task.status == 'reopen'
+                              ? Colors.grey
+                              : Colors.blue,
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 24),
 
@@ -949,7 +1007,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.inter(fontSize: 13, color: secondaryText),
+          style: GoogleFonts.nunito(fontSize: 13, color: secondaryText),
         ),
         const SizedBox(height: 4),
         Wrap(
@@ -959,7 +1017,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           children: [
             Text(
               DateFormat('dd/MM/yyyy HH:mm').format(value),
-              style: GoogleFonts.inter(
+              style: GoogleFonts.nunito(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: textColor,
@@ -976,18 +1034,42 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Widget _buildTaskHeader(double titleFontSize) {
+    final width = MediaQuery.of(context).size.width;
+    final isWeb = width > 900;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          widget.task.title,
-          style: GoogleFonts.inter(
-            fontSize: titleFontSize,
-            fontWeight: FontWeight.w700,
-            color: textColor,
-            height: 1.18,
+        if (!isWeb)
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, size: 24),
+                onPressed: () => Navigator.pop(context),
+              ),
+              Expanded(
+                child: Text(
+                  widget.task.title,
+                  style: GoogleFonts.nunito(
+                    fontSize: titleFontSize,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                    height: 1.18,
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          Text(
+            widget.task.title,
+            style: GoogleFonts.nunito(
+              fontSize: titleFontSize,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+              height: 1.18,
+            ),
           ),
-        ),
         const SizedBox(height: 14),
         Wrap(
           spacing: 12,
@@ -1002,7 +1084,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
               child: Text(
                 "Đang làm",
-                style: GoogleFonts.inter(
+                style: GoogleFonts.nunito(
                   fontWeight: FontWeight.w600,
                   color: Colors.orange.shade800,
                 ),
@@ -1010,7 +1092,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
             Text(
               "Bạn đã tạo công việc vào ${DateFormat('dd/MM/yyyy').format(widget.task.createdAt)}",
-              style: GoogleFonts.inter(color: secondaryText),
+              style: GoogleFonts.nunito(color: secondaryText),
             ),
           ],
         ),
@@ -1019,16 +1101,33 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Widget _buildHeaderActions() {
+    return OutlinedButton.icon(
+      onPressed: _showEditDialog,
+      icon: const Icon(Icons.edit_outlined, size: 18),
+      label: const Text("Chỉnh sửa"),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooterActions() {
     return Wrap(
       spacing: 12,
       runSpacing: 10,
+      alignment: WrapAlignment.center,
       children: [
-        OutlinedButton.icon(
-          onPressed: _showEditDialog,
-          icon: const Icon(Icons.edit_outlined, size: 18),
-          label: const Text("Chỉnh sửa"),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        ElevatedButton.icon(
+          onPressed: _saveTask,
+          icon: const Icon(Icons.save_outlined, size: 18),
+          label: const Text("Lưu"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1041,7 +1140,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1051,14 +1150,39 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
+  Future<void> _saveTask() async {
+    setState(() {
+      widget.task.description = _descriptionController.text.trim();
+      widget.task.attachments = attachments;
+      widget.task.updatedAt = DateTime.now();
+    });
+    await widget.task.save();
+    if (!mounted) return;
+    final provider = Provider.of<TaskProvider>(context, listen: false);
+    await provider.updateTask(widget.task);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu công việc thành công')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-
     final isWeb = width > 900;
-    final horizontalPadding = isWeb ? 40.0 : 16.0;
-    final maxContentWidth = isWeb ? 1120.0 : 640.0;
-    final titleFontSize = isWeb ? 30.0 : 24.0;
+    final isTablet = width > 600 && width <= 900;
+    final maxContentWidth =
+        isWeb ? 1120.0 : (isTablet ? 800.0 : double.infinity);
+    final titleFontSize = isWeb ? 30.0 : (isTablet ? 26.0 : 24.0);
+
+    // Use theme brightness to determine dark mode and update colors
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bgColor = isDark ? ghDarkBg : ghLightBg;
+    cardColor = isDark ? ghDarkCard : ghLightCard;
+    textColor = isDark ? ghDarkText : ghLightText;
+    secondaryText = isDark ? ghDarkSubText : ghLightSubText;
+    borderColor = isDark ? ghDarkBorder : ghLightBorder;
 
     return PopScope(
       canPop: true,
@@ -1083,8 +1207,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               child: SafeArea(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: isWeb ? 28 : 18,
+                    horizontal: isWeb ? 24 : 16,
+                    vertical: isWeb ? 28 : 16,
                   ),
                   child: Center(
                     child: ConstrainedBox(
@@ -1113,28 +1237,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                   ],
                                 ),
 
-                          const SizedBox(height: 30),
+                          SizedBox(height: isWeb ? 30 : 20),
+
+                          /// META SIDEBAR (Nhãn, Trạng thái, Thời gian)
+                          _buildMetaSidebar(),
+                          SizedBox(height: isWeb ? 30 : 20),
 
                           if (isWeb)
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  flex: 7,
                                   child: Column(
                                     children: [
                                       _buildDescriptionCard(),
-                                      const SizedBox(height: 20),
+                                      SizedBox(height: isWeb ? 20 : 16),
                                       _buildAttachmentsCard(),
-                                      const SizedBox(height: 20),
+                                      SizedBox(height: isWeb ? 20 : 16),
                                       _buildActivityCard(),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(width: 28),
-                                SizedBox(
-                                  width: 280,
-                                  child: _buildMetaSidebar(),
                                 ),
                               ],
                             )
@@ -1142,16 +1264,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             Column(
                               children: [
                                 _buildDescriptionCard(),
-                                const SizedBox(height: 20),
+                                SizedBox(height: isWeb ? 20 : 16),
                                 _buildAttachmentsCard(),
-                                const SizedBox(height: 20),
+                                SizedBox(height: isWeb ? 20 : 16),
                                 _buildActivityCard(),
-                                const SizedBox(height: 24),
-                                _buildMetaSidebar(),
                               ],
                             ),
 
-                          const SizedBox(height: 50),
+                          SizedBox(height: isWeb ? 30 : 20),
+
+                          /// FOOTER ACTIONS (Lưu, Xóa)
+                          _buildFooterActions(),
+
+                          SizedBox(height: isWeb ? 50 : 30),
                         ],
                       ),
                     ),

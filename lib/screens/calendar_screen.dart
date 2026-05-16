@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../models/task_model.dart';
 import '../provider/task_provider.dart';
 import '../provider/app_provider.dart';
@@ -11,6 +12,7 @@ import 'task_detail_screen.dart';
 import '../widgets/quick_add_task_dialog.dart';
 import '../widgets/quick_edit_task_dialog.dart';
 import '../widgets/app_popup.dart';
+import '../services/calendar_import_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -106,16 +108,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _prev() {
     setState(() {
-      if (_viewMode == 'day')
+      if (_viewMode == 'day') {
         _selectedDay = _selectedDay.subtract(const Duration(days: 1));
-      else if (_viewMode == 'week')
+      } else if (_viewMode == 'week') {
         _selectedDay = _selectedDay.subtract(const Duration(days: 7));
-      else if (_viewMode == 'month')
+      } else if (_viewMode == 'month') {
         _miniMonth = DateTime(_miniMonth.year, _miniMonth.month - 1);
-      else if (_viewMode == 'year')
+      } else if (_viewMode == 'year') {
         _miniMonth = DateTime(_miniMonth.year - 1, _miniMonth.month);
-      if (_viewMode != 'month' && _viewMode != 'year')
+      }
+      if (_viewMode != 'month' && _viewMode != 'year') {
         _miniMonth = _selectedDay;
+      }
     });
     if (_scroll.hasClients) {
       _scroll.animateTo(
@@ -128,16 +132,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _next() {
     setState(() {
-      if (_viewMode == 'day')
+      if (_viewMode == 'day') {
         _selectedDay = _selectedDay.add(const Duration(days: 1));
-      else if (_viewMode == 'week')
+      } else if (_viewMode == 'week') {
         _selectedDay = _selectedDay.add(const Duration(days: 7));
-      else if (_viewMode == 'month')
+      } else if (_viewMode == 'month') {
         _miniMonth = DateTime(_miniMonth.year, _miniMonth.month + 1);
-      else if (_viewMode == 'year')
+      } else if (_viewMode == 'year') {
         _miniMonth = DateTime(_miniMonth.year + 1, _miniMonth.month);
-      if (_viewMode != 'month' && _viewMode != 'year')
+      }
+      if (_viewMode != 'month' && _viewMode != 'year') {
         _miniMonth = _selectedDay;
+      }
     });
     if (_scroll.hasClients) {
       _scroll.animateTo(
@@ -238,348 +244,441 @@ class _CalendarScreenState extends State<CalendarScreen> {
       curve: Curves.easeInOut,
       padding: EdgeInsets.symmetric(
         horizontal: isWeb ? 20 : 8,
-        vertical: isWeb ? 14 : 8,
+        vertical: isWeb ? 12 : 6,
       ),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: borderColor)),
       ),
-      child: Row(
-        children: [
-          if (isWeb)
-            PopupMenuButton<String>(
-              icon: Icon(Icons.menu, color: textColor, size: isWeb ? 24 : 22),
-              padding: EdgeInsets.zero,
-              onSelected: (value) {
-                if (value == 'day' ||
-                    value == 'week' ||
-                    value == 'month' ||
-                    value == 'year') {
-                  setState(() => _viewMode = value);
-                } else if (value == 'toggle_filters') {
-                  setState(() => _showFilters = !_showFilters);
-                } else if (value == 'clear_filters') {
-                  setState(() {
-                    _selectedProjectIds = [];
-                    _selectedCategories = [];
-                  });
-                } else if (value.startsWith('category_')) {
-                  final category = value.replaceFirst('category_', '');
-                  setState(() {
-                    if (_selectedCategories.contains(category)) {
-                      _selectedCategories.remove(category);
-                    } else {
-                      _selectedCategories.add(category);
+      child: Builder(
+        builder: (context) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              if (isWeb)
+                PopupMenuButton<String>(
+                  icon:
+                      Icon(Icons.menu, color: textColor, size: isWeb ? 24 : 22),
+                  padding: EdgeInsets.zero,
+                  onSelected: (value) {
+                    if (value == 'day' ||
+                        value == 'week' ||
+                        value == 'month' ||
+                        value == 'year') {
+                      setState(() => _viewMode = value);
+                    } else if (value == 'toggle_filters') {
+                      setState(() => _showFilters = !_showFilters);
+                    } else if (value == 'clear_filters') {
+                      setState(() {
+                        _selectedProjectIds = [];
+                        _selectedCategories = [];
+                      });
+                    } else if (value.startsWith('category_')) {
+                      final category = value.replaceFirst('category_', '');
+                      setState(() {
+                        if (_selectedCategories.contains(category)) {
+                          _selectedCategories.remove(category);
+                        } else {
+                          _selectedCategories.add(category);
+                        }
+                      });
+                    } else if (value.startsWith('project_')) {
+                      final projectId = value.replaceFirst('project_', '');
+                      setState(() {
+                        if (_selectedProjectIds.contains(projectId)) {
+                          _selectedProjectIds.remove(projectId);
+                        } else {
+                          _selectedProjectIds.add(projectId);
+                        }
+                      });
                     }
-                  });
-                } else if (value.startsWith('project_')) {
-                  final projectId = value.replaceFirst('project_', '');
-                  setState(() {
-                    if (_selectedProjectIds.contains(projectId)) {
-                      _selectedProjectIds.remove(projectId);
-                    } else {
-                      _selectedProjectIds.add(projectId);
-                    }
-                  });
-                }
-              },
-              itemBuilder: (context) {
-                final categories = ['Công việc', 'Cá nhân', 'Học tập', 'Khác'];
-                final provider =
-                    Provider.of<TaskProvider>(context, listen: false);
-                final projects = provider.projects;
+                  },
+                  itemBuilder: (context) {
+                    final categories = [
+                      'Công việc',
+                      'Cá nhân',
+                      'Học tập',
+                      'Khác'
+                    ];
+                    final provider =
+                        Provider.of<TaskProvider>(context, listen: false);
+                    final projects = provider.projects;
 
-                return [
-                  const PopupMenuItem(
-                    value: 'day',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_today, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo ngày'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'week',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_view_week, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo tuần'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'month',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_month, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo tháng'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'year',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_view_month, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo năm'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    enabled: false,
-                    child: Text(
-                      'Lọc theo danh mục',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                  ...categories.map((category) => PopupMenuItem(
-                        value: 'category_$category',
+                    return [
+                      const PopupMenuItem(
+                        value: 'day',
                         child: Row(
                           children: [
-                            Icon(
-                              _selectedCategories.contains(category)
-                                  ? Icons.check_box
-                                  : Icons.check_box_outline_blank,
-                              size: 18,
-                            ),
+                            Icon(Icons.calendar_today, size: 18),
                             SizedBox(width: 12),
-                            Text(category),
+                            Text('Xem theo ngày'),
                           ],
                         ),
-                      )),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    enabled: false,
-                    child: Text(
-                      'Lọc theo dự án',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                  ...projects.map((project) => PopupMenuItem(
-                        value: 'project_${project.project_id}',
+                      ),
+                      const PopupMenuItem(
+                        value: 'week',
                         child: Row(
                           children: [
-                            Icon(
-                              _selectedProjectIds.contains(project.project_id)
-                                  ? Icons.check_box
-                                  : Icons.check_box_outline_blank,
-                              size: 18,
-                            ),
+                            Icon(Icons.calendar_view_week, size: 18),
                             SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                project.name,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                            Text('Xem theo tuần'),
                           ],
                         ),
-                      )),
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: 'clear_filters',
-                    child: Row(
-                      children: [
-                        Icon(Icons.clear_all, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xóa bộ lọc'),
-                      ],
-                    ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'month',
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_month, size: 18),
+                            SizedBox(width: 12),
+                            Text('Xem theo tháng'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'year',
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_view_month, size: 18),
+                            SizedBox(width: 12),
+                            Text('Xem theo năm'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        enabled: false,
+                        child: Text(
+                          'Lọc theo danh mục',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      ...categories.map((category) => PopupMenuItem(
+                            value: 'category_$category',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedCategories.contains(category)
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Text(category),
+                              ],
+                            ),
+                          )),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        enabled: false,
+                        child: Text(
+                          'Lọc theo dự án',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      ...projects.map((project) => PopupMenuItem(
+                            value: 'project_${project.project_id}',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedProjectIds
+                                          .contains(project.project_id)
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    project.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'clear_filters',
+                        child: Row(
+                          children: [
+                            Icon(Icons.clear_all, size: 18),
+                            SizedBox(width: 12),
+                            Text('Xóa bộ lọc'),
+                          ],
+                        ),
+                      ),
+                    ];
+                  },
+                ),
+              if (!isWeb)
+                IconButton(
+                  icon: Icon(Icons.arrow_back, color: textColor, size: 22),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => Navigator.pop(context),
+                ),
+              Flexible(
+                child: Text(
+                  label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isWeb ? 18 : 14,
+                    letterSpacing: 1.0,
                   ),
-                ];
-              },
-            ),
-          if (!isWeb)
-            IconButton(
-              icon: Icon(Icons.arrow_back, color: textColor, size: 22),
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-              onPressed: () => Navigator.pop(context),
-            ),
-          Flexible(
-            child: Text(
-              label.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.bold,
-                fontSize: isWeb ? 18 : 14,
-                letterSpacing: 1.0,
+                ),
               ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.chevron_left, size: isWeb ? 24 : 22),
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
-            onPressed: _prev,
-          ),
-          IconButton(
-            icon: Icon(Icons.chevron_right, size: isWeb ? 24 : 22),
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
-            onPressed: _next,
-          ),
-          if (!isWeb)
-            PopupMenuButton<String>(
-              icon: Icon(Icons.menu, color: textColor, size: 22),
-              padding: EdgeInsets.zero,
-              onSelected: (value) {
-                if (value == 'day' ||
-                    value == 'week' ||
-                    value == 'month' ||
-                    value == 'year') {
-                  setState(() => _viewMode = value);
-                } else if (value == 'toggle_filters') {
-                  setState(() => _showFilters = !_showFilters);
-                } else if (value == 'clear_filters') {
-                  setState(() {
-                    _selectedProjectIds = [];
-                    _selectedCategories = [];
-                  });
-                } else if (value.startsWith('category_')) {
-                  final category = value.replaceFirst('category_', '');
-                  setState(() {
-                    if (_selectedCategories.contains(category)) {
-                      _selectedCategories.remove(category);
-                    } else {
-                      _selectedCategories.add(category);
+              IconButton(
+                icon: Icon(Icons.chevron_left, size: isWeb ? 24 : 22),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                onPressed: _prev,
+              ),
+              IconButton(
+                icon: Icon(Icons.chevron_right, size: isWeb ? 24 : 22),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                onPressed: _next,
+              ),
+              IconButton(
+                icon: const Icon(Icons.upload),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                onPressed: () async {
+                  final events = await CalendarImportService.importICS();
+                  if (events.isEmpty) {
+                    if (mounted) {
+                      AppPopup.show(
+                        context,
+                        title: 'Import thất bại',
+                        message:
+                            'Không thể import file ICS. Vui lòng kiểm tra lại.',
+                        color: ghOrange,
+                        icon: Icons.error,
+                      );
                     }
-                  });
-                } else if (value.startsWith('project_')) {
-                  final projectId = value.replaceFirst('project_', '');
-                  setState(() {
-                    if (_selectedProjectIds.contains(projectId)) {
-                      _selectedProjectIds.remove(projectId);
-                    } else {
-                      _selectedProjectIds.add(projectId);
-                    }
-                  });
-                }
-              },
-              itemBuilder: (context) {
-                final categories = ['Công việc', 'Cá nhân', 'Học tập', 'Khác'];
-                final provider =
-                    Provider.of<TaskProvider>(context, listen: false);
-                final projects = provider.projects;
+                    return;
+                  }
 
-                return [
-                  const PopupMenuItem(
-                    value: 'day',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_today, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo ngày'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'week',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_view_week, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo tuần'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'month',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_month, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo tháng'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'year',
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_view_month, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xem theo năm'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    enabled: false,
-                    child: Text(
-                      'Lọc theo danh mục',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                  ...categories.map((category) => PopupMenuItem(
-                        value: 'category_$category',
+                  if (!mounted) return;
+                  final provider =
+                      Provider.of<TaskProvider>(context, listen: false);
+                  int importedCount = 0;
+                  int skippedCount = 0;
+
+                  for (var event in events) {
+                    final start = event['start'] as DateTime?;
+                    final end = event['end'] as DateTime?;
+                    if (start == null || end == null) {
+                      skippedCount++;
+                      continue;
+                    }
+
+                    final duration = end.difference(start).inMinutes;
+
+                    final task = Task(
+                      task_id: const Uuid().v4(),
+                      user_id: 'current_user',
+                      title: event['title'] as String? ?? 'Không có tiêu đề',
+                      description: event['description'] as String? ?? '',
+                      due_day: start,
+                      deadline: end,
+                      duration: duration,
+                      priority: event['priority'] as int? ?? 1,
+                      status: 'pending',
+                      progress: 0,
+                      category: event['category'] as String? ?? 'Công việc',
+                      createdAt: DateTime.now(),
+                      updatedAt: DateTime.now(),
+                      isSynced: false,
+                    );
+
+                    await provider.addTask(task);
+                    importedCount++;
+                  }
+
+                  if (mounted) {
+                    String message =
+                        'Đã import thành công $importedCount công việc từ lịch';
+                    if (skippedCount > 0) {
+                      message +=
+                          '\n(Bỏ qua $skippedCount công việc không hợp lệ)';
+                    }
+
+                    AppPopup.show(
+                      context,
+                      title: 'Đã import',
+                      message: message,
+                      color: ghGreen,
+                      icon: Icons.check_circle,
+                    );
+                  }
+                },
+              ),
+              if (!isWeb)
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.menu, color: textColor, size: 22),
+                  padding: EdgeInsets.zero,
+                  onSelected: (value) {
+                    if (value == 'day' ||
+                        value == 'week' ||
+                        value == 'month' ||
+                        value == 'year') {
+                      setState(() => _viewMode = value);
+                    } else if (value == 'toggle_filters') {
+                      setState(() => _showFilters = !_showFilters);
+                    } else if (value == 'clear_filters') {
+                      setState(() {
+                        _selectedProjectIds = [];
+                        _selectedCategories = [];
+                      });
+                    } else if (value.startsWith('category_')) {
+                      final category = value.replaceFirst('category_', '');
+                      setState(() {
+                        if (_selectedCategories.contains(category)) {
+                          _selectedCategories.remove(category);
+                        } else {
+                          _selectedCategories.add(category);
+                        }
+                      });
+                    } else if (value.startsWith('project_')) {
+                      final projectId = value.replaceFirst('project_', '');
+                      setState(() {
+                        if (_selectedProjectIds.contains(projectId)) {
+                          _selectedProjectIds.remove(projectId);
+                        } else {
+                          _selectedProjectIds.add(projectId);
+                        }
+                      });
+                    }
+                  },
+                  itemBuilder: (context) {
+                    final categories = [
+                      'Công việc',
+                      'Cá nhân',
+                      'Học tập',
+                      'Khác'
+                    ];
+                    final provider =
+                        Provider.of<TaskProvider>(context, listen: false);
+                    final projects = provider.projects;
+
+                    return [
+                      const PopupMenuItem(
+                        value: 'day',
                         child: Row(
                           children: [
-                            Icon(
-                              _selectedCategories.contains(category)
-                                  ? Icons.check_box
-                                  : Icons.check_box_outline_blank,
-                              size: 18,
-                            ),
+                            Icon(Icons.calendar_today, size: 18),
                             SizedBox(width: 12),
-                            Text(category),
+                            Text('Xem theo ngày'),
                           ],
                         ),
-                      )),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    enabled: false,
-                    child: Text(
-                      'Lọc theo dự án',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                  ...projects.map((project) => PopupMenuItem(
-                        value: 'project_${project.project_id}',
+                      ),
+                      const PopupMenuItem(
+                        value: 'week',
                         child: Row(
                           children: [
-                            Icon(
-                              _selectedProjectIds.contains(project.project_id)
-                                  ? Icons.check_box
-                                  : Icons.check_box_outline_blank,
-                              size: 18,
-                            ),
+                            Icon(Icons.calendar_view_week, size: 18),
                             SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                project.name,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                            Text('Xem theo tuần'),
                           ],
                         ),
-                      )),
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: 'clear_filters',
-                    child: Row(
-                      children: [
-                        Icon(Icons.clear_all, size: 18),
-                        SizedBox(width: 12),
-                        Text('Xóa bộ lọc'),
-                      ],
-                    ),
-                  ),
-                ];
-              },
-            ),
-        ],
+                      ),
+                      const PopupMenuItem(
+                        value: 'month',
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_month, size: 18),
+                            SizedBox(width: 12),
+                            Text('Xem theo tháng'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'year',
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_view_month, size: 18),
+                            SizedBox(width: 12),
+                            Text('Xem theo năm'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        enabled: false,
+                        child: Text(
+                          'Lọc theo danh mục',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      ...categories.map((category) => PopupMenuItem(
+                            value: 'category_$category',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedCategories.contains(category)
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Text(category),
+                              ],
+                            ),
+                          )),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        enabled: false,
+                        child: Text(
+                          'Lọc theo dự án',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      ...projects.map((project) => PopupMenuItem(
+                            value: 'project_${project.project_id}',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedProjectIds
+                                          .contains(project.project_id)
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    project.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'clear_filters',
+                        child: Row(
+                          children: [
+                            Icon(Icons.clear_all, size: 18),
+                            SizedBox(width: 12),
+                            Text('Xóa bộ lọc'),
+                          ],
+                        ),
+                      ),
+                    ];
+                  },
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -598,6 +697,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -618,10 +718,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
               _selectedProjectIds,
               (id) {
                 setState(() {
-                  if (_selectedProjectIds.contains(id))
+                  if (_selectedProjectIds.contains(id)) {
                     _selectedProjectIds.remove(id);
-                  else
+                  } else {
                     _selectedProjectIds.add(id);
+                  }
                 });
               },
               isDark,
@@ -637,10 +738,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
               _selectedCategories,
               (id) {
                 setState(() {
-                  if (_selectedCategories.contains(id))
+                  if (_selectedCategories.contains(id)) {
                     _selectedCategories.remove(id);
-                  else
+                  } else {
                     _selectedCategories.add(id);
+                  }
                 });
               },
               isDark,
@@ -785,7 +887,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     color: isToday
                         ? ghGreen
                         : (isSel
-                            ? ghBlue.withOpacity(0.2)
+                            ? ghBlue.withValues(alpha: 0.2)
                             : Colors.transparent),
                     shape: BoxShape.circle,
                   ),
@@ -854,20 +956,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
         Expanded(
           child: SingleChildScrollView(
             controller: _scroll,
-            child: SizedBox(
-              height: _hh * 24,
-              child: Row(
-                children: [
-                  _buildTimeGutter(isDark),
-                  Expanded(
-                    child: _buildDayColumn(
-                      _selectedDay,
-                      tasks,
-                      isDark,
-                      borderColor,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: _hh * 24,
+              ),
+              child: SizedBox(
+                height: _hh * 24,
+                child: Row(
+                  children: [
+                    _buildTimeGutter(isDark),
+                    Expanded(
+                      child: _buildDayColumn(
+                        _selectedDay,
+                        tasks,
+                        isDark,
+                        borderColor,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -890,18 +997,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
         Expanded(
           child: SingleChildScrollView(
             controller: _scroll,
-            child: SizedBox(
-              height: _hh * 24,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildTimeGutter(isDark),
-                  ...days.map(
-                    (d) => Expanded(
-                      child: _buildDayColumn(d, tasks, isDark, borderColor),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: _hh * 24,
+              ),
+              child: SizedBox(
+                height: _hh * 24,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildTimeGutter(isDark),
+                    ...days.map(
+                      (d) => Expanded(
+                        child: _buildDayColumn(d, tasks, isDark, borderColor),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1037,10 +1149,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _columnKeys[day] ??= GlobalKey();
 
     return DragTarget<Task>(
-      onWillAccept: (data) => true,
+      onWillAcceptWithDetails: (details) => true,
       onAcceptWithDetails: (details) async {
-        final renderBox =
-            _columnKeys[day]!.currentContext!.findRenderObject() as RenderBox;
+        final context = _columnKeys[day]?.currentContext;
+        if (context == null) return;
+
+        final renderBox = context.findRenderObject() as RenderBox?;
+        if (renderBox == null || !renderBox.hasSize) return;
+
         final localOffset = renderBox.globalToLocal(details.offset);
 
         // Calculate new hour and minute
@@ -1071,10 +1187,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         task.updatedAt = DateTime.now();
         task.isSynced = false;
 
+        if (!mounted) return;
         await Provider.of<TaskProvider>(
           context,
           listen: false,
         ).updateTask(task);
+        if (!mounted) return;
         AppPopup.show(
           context,
           title: 'Đã cập nhật',
@@ -1143,7 +1261,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ).map((task) => _buildTaskBlock(task, isDark)),
               if (candidateData.isNotEmpty)
                 Positioned.fill(
-                  child: Container(color: ghBlue.withOpacity(0.05)),
+                  child: Container(color: ghBlue.withValues(alpha: 0.05)),
                 ),
             ],
           ),
@@ -1223,12 +1341,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 decoration: BoxDecoration(
-                  color: color.withOpacity(isDark ? 0.5 : 0.4),
+                  color: color.withValues(alpha: isDark ? 0.5 : 0.4),
                   borderRadius: BorderRadius.circular(8),
                   border: Border(left: BorderSide(color: color, width: 5)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1236,12 +1354,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
                 padding: const EdgeInsets.all(10),
                 child: SizedBox(
-                  width: (_columnKeys[task.due_day]
-                              ?.currentContext
-                              ?.findRenderObject() as RenderBox?)
-                          ?.size
-                          .width ??
-                      150,
+                  width: (() {
+                    final context = _columnKeys[task.due_day]?.currentContext;
+                    if (context == null) return 150.0;
+                    final renderBox = context.findRenderObject() as RenderBox?;
+                    if (renderBox == null || !renderBox.hasSize) return 150.0;
+                    return renderBox.size.width;
+                  })(),
                   height: currentH,
                   child: content,
                 ),
@@ -1251,7 +1370,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               opacity: 0.3,
               child: Container(
                 decoration: BoxDecoration(
-                  color: color.withOpacity(isDark ? 0.1 : 0.1),
+                  color: color.withValues(alpha: isDark ? 0.1 : 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border(left: BorderSide(color: color, width: 5)),
                 ),
@@ -1330,7 +1449,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       context,
                       title: 'Đã cập nhật',
                       message:
-                          "Đã thay đổi thời lượng '${task.title}' thành ${newDuration} phút",
+                          "Đã thay đổi thời lượng '${task.title}' thành $newDuration phút",
                       color: ghGreen,
                       icon: Icons.access_time,
                     );
@@ -1342,11 +1461,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 curve: Curves.easeOut,
                 decoration: BoxDecoration(
                   color: _resizingTask == task
-                      ? color.withOpacity(0.7)
-                      : color.withOpacity(0.5),
+                      ? color.withValues(alpha: 0.7)
+                      : color.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(8),
-                    bottomRight: Radius.circular(8),
+                    bottomLeft: const Radius.circular(8),
+                    bottomRight: const Radius.circular(8),
                   ),
                 ),
                 child: Center(
@@ -1439,12 +1558,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
             itemCount: rows * 7,
             itemBuilder: (_, i) {
               final dayNum = i - offset + 1;
-              if (dayNum < 1 || dayNum > daysCount)
+              if (dayNum < 1 || dayNum > daysCount) {
                 return Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: borderColor, width: 0.2),
                   ),
                 );
+              }
               final day = DateTime(_miniMonth.year, _miniMonth.month, dayNum);
               final dayTasks = _forDay(day, tasks);
               final isToday = _same(day, now);
@@ -1488,7 +1608,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: _taskColor(t.priority).withOpacity(0.2),
+                                color: _taskColor(t.priority)
+                                    .withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(

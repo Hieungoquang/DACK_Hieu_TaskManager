@@ -184,14 +184,14 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         _buildHeader(isDark),
         Expanded(
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(isWeb ? 40 : 24),
+            padding: EdgeInsets.all(isWeb ? 24 : 20),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 900),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTitleInput(isDark),
+                    _buildTitleInput(isDark, isWeb),
                     const SizedBox(height: 16),
                     _buildDescriptionSection(isDark),
                     const SizedBox(height: 16),
@@ -262,7 +262,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     );
   }
 
-  Widget _buildTitleInput(bool isDark) {
+  Widget _buildTitleInput(bool isDark, bool isWeb) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -297,9 +297,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             hintStyle: TextStyle(color: _sub(isDark).withOpacity(0.5)),
             filled: true,
             fillColor: _input(isDark),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 10,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isWeb ? 24 : 20,
+              vertical: isWeb ? 28 : 18,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
@@ -610,7 +610,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           InkWell(
             onTap: _save,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: const Text(
                 "Tạo",
                 style: TextStyle(

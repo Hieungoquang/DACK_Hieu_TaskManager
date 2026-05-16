@@ -306,12 +306,7 @@ class NotificationScreen extends StatelessWidget {
   }
 
   String _formatTime(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-    if (diff.inMinutes < 1) return "Vừa xong";
-    if (diff.inMinutes < 60) return "${diff.inMinutes} phút trước";
-    if (diff.inHours < 24) return "${diff.inHours} giờ trước";
-    return DateFormat('dd/MM').format(date);
+    return DateFormat('dd/MM/yyyy HH:mm').format(date);
   }
 
   void _markAllAsRead() {

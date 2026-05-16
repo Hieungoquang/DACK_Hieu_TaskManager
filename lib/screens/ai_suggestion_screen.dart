@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/task_model.dart';
 import '../provider/task_provider.dart';
+import '../provider/app_provider.dart';
 import '../services/ai_service.dart';
 import '../widgets/web_sidebar.dart';
 import '../widgets/mobile_bottom_nav.dart';
@@ -23,13 +25,19 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
   bool _isLoading = false;
   bool _isSaving = false;
 
-  final Color duoPurple = const Color(0xFFCE82FF);
-  final Color duoPurpleDark = const Color(0xFFA55EEA);
-  final Color duoGreen = const Color(0xFF58CC02);
-  final Color duoGreenDark = const Color(0xFF46A302);
-  final Color duoGray = const Color(0xFFE5E5E5);
-  final Color duoText = const Color(0xFF1F1F1F);
-  final Color duoSecondaryText = const Color(0xFF4B4B4B);
+  // GitHub Style Colors
+  static const Color ghBlue = Color(0xFF58A6FF);
+  static const Color ghGreen = Color(0xFF3FB950);
+  static const Color ghDarkBg = Color(0xFF0D1117);
+  static const Color ghLightBg = Color(0xFFF6F8FA);
+  static const Color ghDarkCard = Color(0xFF161B22);
+  static const Color ghLightCard = Color(0xFFFFFFFF);
+  static const Color ghDarkBorder = Color(0xFF30363D);
+  static const Color ghLightBorder = Color(0xFFD0D7DE);
+  static const Color ghDarkText = Color(0xFFC9D1D9);
+  static const Color ghLightText = Color(0xFF24292F);
+  static const Color ghDarkSubText = Color(0xFF8B949E);
+  static const Color ghLightSubText = Color(0xFF57606A);
 
   void _getAiSuggestions() async {
     final title = _taskController.text.trim();
@@ -126,109 +134,128 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : duoText;
-    final labelColor =
-        isDark ? Colors.white.withOpacity(0.7) : duoSecondaryText;
-    final inputBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF7F7F7);
-    final borderColor = isDark ? const Color(0xFF37464F) : duoGray;
+    final appProvider = Provider.of<AppProvider>(context);
+    final isDark = appProvider.themeMode == ThemeMode.dark;
+    final textColor = isDark ? ghDarkText : ghLightText;
+    final labelColor = isDark ? ghDarkSubText : ghLightSubText;
+    final inputBg = isDark ? ghDarkCard : ghLightCard;
+    final borderColor = isDark ? ghDarkBorder : ghLightBorder;
 
     double width = MediaQuery.of(context).size.width;
     bool isWeb = width > 900;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? ghDarkBg : ghLightBg,
       appBar: isWeb
           ? null
           : AppBar(
-              backgroundColor: theme.scaffoldBackgroundColor,
+              backgroundColor: isDark ? ghDarkBg : ghLightBg,
               elevation: 0,
-              leading: IconButton(
-                icon: Icon(Icons.close, color: labelColor, size: 28),
-                onPressed: _handleBackNavigation,
-              ),
+              centerTitle: false,
               title: Text(
                 "AI TRỢ LÝ",
-                style: TextStyle(
-                  color: duoPurpleDark,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                  letterSpacing: 1.2,
+                style: GoogleFonts.quicksand(
+                  color: isDark ? ghDarkText : ghLightText,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
                 ),
               ),
-              centerTitle: true,
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back,
+                    color: isDark ? ghDarkSubText : ghLightSubText, size: 24),
+                onPressed: _handleBackNavigation,
+              ),
             ),
       bottomNavigationBar: isWeb ? null : MobileBottomNav(currentRoute: 'ai'),
       body: Row(
         children: [
           if (isWeb) const WebSidebar(currentRoute: 'ai'),
           Expanded(
-            child: Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: isWeb
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: SingleChildScrollView(
-                                    padding: const EdgeInsets.all(40),
-                                    child: _buildInputSection(
-                                      inputBg,
-                                      borderColor,
-                                      isDark,
-                                      textColor,
-                                      labelColor,
-                                      isWeb,
-                                    ),
-                                  ),
+            child: Column(
+              children: [
+                if (isWeb) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 30, 24, 20),
+                    child: Row(
+                      children: [
+                        Text(
+                          "AI TRỢ LÝ",
+                          style: GoogleFonts.quicksand(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: isWeb
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.only(
+                                  left: 24,
+                                  right: 24,
+                                  bottom: 24,
                                 ),
-                                Expanded(
-                                  flex: 3,
-                                  child: _buildResultSection(
-                                    isDark,
-                                    borderColor,
-                                    textColor,
-                                    labelColor,
-                                    isWeb,
-                                  ),
+                                child: _buildInputSection(
+                                  inputBg,
+                                  borderColor,
+                                  isDark,
+                                  textColor,
+                                  labelColor,
+                                  isWeb,
                                 ),
-                              ],
-                            )
-                          : SingleChildScrollView(
-                              padding: const EdgeInsets.all(25.0),
-                              child: Column(
-                                children: [
-                                  _buildInputSection(
-                                    inputBg,
-                                    borderColor,
-                                    isDark,
-                                    textColor,
-                                    labelColor,
-                                    isWeb,
-                                  ),
-                                  const SizedBox(height: 30),
-                                  _buildResultSection(
-                                    isDark,
-                                    borderColor,
-                                    textColor,
-                                    labelColor,
-                                    isWeb,
-                                  ),
-                                ],
                               ),
                             ),
-                    ),
-                    if (_suggestedSubtasks.isNotEmpty)
-                      _buildBottomAction(isWeb, isDark, borderColor),
-                  ],
+                            Expanded(
+                              flex: 3,
+                              child: _buildResultSection(
+                                isDark,
+                                borderColor,
+                                textColor,
+                                labelColor,
+                                isWeb,
+                              ),
+                            ),
+                          ],
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.only(
+                            left: 20,
+                            right: 20,
+                            bottom: 20,
+                          ),
+                          child: Column(
+                            children: [
+                              _buildInputSection(
+                                inputBg,
+                                borderColor,
+                                isDark,
+                                textColor,
+                                labelColor,
+                                isWeb,
+                              ),
+                              const SizedBox(height: 30),
+                              _buildResultSection(
+                                isDark,
+                                borderColor,
+                                textColor,
+                                labelColor,
+                                isWeb,
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
-              ),
+                if (_suggestedSubtasks.isNotEmpty)
+                  _buildBottomAction(isWeb, isDark, borderColor),
+              ],
             ),
           ),
         ],
@@ -247,44 +274,25 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (isWeb) ...[
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(Icons.arrow_back_ios, color: labelColor),
-                onPressed: _handleBackNavigation,
-              ),
-              Text(
-                "AI TRỢ LÝ",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: textColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 30),
-        ],
         Text(
           "MÌNH GIÚP GÌ ĐƯỢC BẠN NHỈ?",
-          style: TextStyle(
+          style: GoogleFonts.quicksand(
             fontSize: 12,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.bold,
             color: labelColor,
             letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(
           "Nhập mục tiêu để mình chia nhỏ công việc giúp bạn!",
-          style: TextStyle(
+          style: GoogleFonts.quicksand(
             fontSize: isWeb ? 24 : 22,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.bold,
             color: textColor,
           ),
         ),
-        const SizedBox(height: 30),
+        const SizedBox(height: 16),
         _buildDuoTextField(inputBg, borderColor, isDark, textColor, labelColor),
       ],
     );
@@ -302,13 +310,13 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: duoPurple, strokeWidth: 5),
+            CircularProgressIndicator(color: ghBlue, strokeWidth: 5),
             const SizedBox(height: 20),
             Text(
               "ĐANG PHÙ PHÉP...",
-              style: TextStyle(
-                color: duoPurpleDark,
-                fontWeight: FontWeight.w900,
+              style: GoogleFonts.quicksand(
+                color: ghBlue,
+                fontWeight: FontWeight.bold,
                 fontSize: 14,
                 letterSpacing: 1.1,
               ),
@@ -331,10 +339,10 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
         children: [
           Text(
             "LỘ TRÌNH ĐỀ XUẤT:",
-            style: TextStyle(
+            style: GoogleFonts.quicksand(
               fontSize: 13,
-              fontWeight: FontWeight.w900,
-              color: duoPurpleDark,
+              fontWeight: FontWeight.bold,
+              color: ghBlue,
               letterSpacing: 1.2,
             ),
           ),
@@ -370,17 +378,18 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
       child: TextField(
         controller: _taskController,
         onSubmitted: (_) => _getAiSuggestions(),
-        style: TextStyle(fontWeight: FontWeight.w900, color: textColor),
+        style: GoogleFonts.quicksand(
+            fontWeight: FontWeight.bold, color: textColor),
         decoration: InputDecoration(
           hintText: "Ví dụ: Học lập trình Flutter...",
-          hintStyle: TextStyle(
+          hintStyle: GoogleFonts.quicksand(
             color: labelColor.withOpacity(0.5),
             fontWeight: FontWeight.bold,
           ),
-          contentPadding: const EdgeInsets.all(20),
+          contentPadding: const EdgeInsets.all(16),
           border: InputBorder.none,
           suffixIcon: IconButton(
-            icon: Icon(Icons.auto_awesome, color: duoPurpleDark),
+            icon: Icon(Icons.auto_awesome, color: ghBlue),
             onPressed: _getAiSuggestions,
           ),
         ),
@@ -396,9 +405,9 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? ghDarkCard : ghLightCard,
         borderRadius: BorderRadius.circular(18),
         border: Border(
           top: BorderSide(color: borderColor, width: 2),
@@ -409,13 +418,13 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.bolt_rounded, color: duoPurple, size: 24),
+          Icon(Icons.bolt_rounded, color: ghBlue, size: 24),
           const SizedBox(width: 15),
           Expanded(
             child: Text(
               title,
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
+              style: GoogleFonts.quicksand(
+                fontWeight: FontWeight.bold,
                 color: textColor,
                 fontSize: 15,
               ),
@@ -436,9 +445,9 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
           Text(
             "CHƯA CÓ Ý TƯỞNG GÌ?\nHÃY THỬ NHẬP MỤC TIÊU CỦA BẠN!",
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: GoogleFonts.quicksand(
               color: labelColor,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.bold,
               fontSize: 13,
               letterSpacing: 1.1,
             ),
@@ -459,7 +468,8 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
             const SizedBox(height: 20),
             Text(
               "KẾT QUẢ SẼ XUẤT HIỆN TẠI ĐÂY",
-              style: TextStyle(color: labelColor, fontWeight: FontWeight.w900),
+              style: GoogleFonts.quicksand(
+                  color: labelColor, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -469,48 +479,43 @@ class _AiSuggestionScreenState extends State<AiSuggestionScreen> {
 
   Widget _buildBottomAction(bool isWeb, bool isDark, Color borderColor) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: isWeb ? 40 : 20, vertical: 20),
+      padding: EdgeInsets.symmetric(horizontal: isWeb ? 24 : 20, vertical: 20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121212) : Colors.white,
+        color: isDark ? ghDarkCard : ghLightCard,
         border: Border(top: BorderSide(color: borderColor, width: 2)),
       ),
       child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isWeb ? 400 : double.infinity),
-          child: ElevatedButton(
-            onPressed: _isSaving ? null : _addTasksToSystem,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: duoGreen,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              elevation: 0,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_isSaving)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
+        child: ElevatedButton.icon(
+          onPressed: _isSaving ? null : _addTasksToSystem,
+          icon: _isSaving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
-                if (_isSaving) const SizedBox(width: 15),
-                Text(
-                  _isSaving ? "ĐANG LƯU..." : "THÊM VÀO LỘ TRÌNH",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ],
+                )
+              : const Icon(Icons.add_task, size: 20),
+          label: Text(
+            _isSaving ? "ĐANG LƯU..." : "THÊM VÀO DANH SÁCH",
+            style: GoogleFonts.quicksand(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              letterSpacing: 1.1,
             ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ghGreen,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(
+              horizontal: isWeb ? 40 : 30,
+              vertical: 16,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
           ),
         ),
       ),

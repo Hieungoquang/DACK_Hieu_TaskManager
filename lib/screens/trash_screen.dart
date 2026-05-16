@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../provider/task_provider.dart';
+import '../provider/app_provider.dart';
 import '../widgets/web_sidebar.dart';
 import 'task_detail_screen.dart';
 
@@ -15,8 +16,8 @@ class TrashScreen extends StatefulWidget {
 class _TrashScreenState extends State<TrashScreen> {
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final appProvider = Provider.of<AppProvider>(context);
+    final isDark = appProvider.themeMode == ThemeMode.dark;
     final provider = context.watch<TaskProvider>();
     final deletedProjects = provider.deletedProjects;
     final deletedTasks = provider.deletedTasks;
@@ -326,7 +327,8 @@ class _TrashScreenState extends State<TrashScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        final isDark = appProvider.themeMode == ThemeMode.dark;
         return AlertDialog(
           backgroundColor: isDark ? const Color(0xFF161B22) : Colors.white,
           title: Text(
@@ -373,7 +375,8 @@ class _TrashScreenState extends State<TrashScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        final isDark = appProvider.themeMode == ThemeMode.dark;
         return AlertDialog(
           backgroundColor: isDark ? const Color(0xFF161B22) : Colors.white,
           title: Text(
@@ -409,7 +412,8 @@ class _TrashScreenState extends State<TrashScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        final isDark = appProvider.themeMode == ThemeMode.dark;
         return AlertDialog(
           backgroundColor: isDark ? const Color(0xFF161B22) : Colors.white,
           title: Text(
