@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 part 'task_schedule_model.g.dart';
 
 @HiveType(typeId: 5)
-class TaskSchedule extends HiveObject{
+class TaskSchedule extends HiveObject {
   @HiveField(0)
   String schedule_id;
   @HiveField(1)

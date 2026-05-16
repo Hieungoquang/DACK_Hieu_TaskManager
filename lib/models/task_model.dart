@@ -1,4 +1,4 @@
-import'package:hive/hive.dart';
+import 'package:hive/hive.dart';
 part 'task_model.g.dart';
 
 @HiveType(typeId: 0)
@@ -22,7 +22,7 @@ class Task extends HiveObject {
   @HiveField(8)
   DateTime deadline;
   @HiveField(9)
-  String status;
+  String status; // 'pending', 'in_progress', 'completed'
   @HiveField(10)
   DateTime createdAt;
   @HiveField(11)
@@ -31,6 +31,18 @@ class Task extends HiveObject {
   bool isSynced;
   @HiveField(13)
   bool isDeleted;
+  @HiveField(14)
+  String category; // 'Công việc', 'Cá nhân', 'Học tập',...
+  @HiveField(15)
+  int orderIndex; // Thứ tự hiển thị
+  @HiveField(16)
+  String? project_id; // Liên kết với dự án
+  @HiveField(17)
+  String? assigneeId; // ID người thực hiện
+  @HiveField(18)
+  List<String> attachments; // Danh sách tệp đính kèm
+  @HiveField(19)
+  int reminder; // Thời gian thông báo trước (phút), 0 = không thông báo
 
   Task({
     required this.task_id,
@@ -47,5 +59,11 @@ class Task extends HiveObject {
     required this.updatedAt,
     this.isSynced = false,
     this.isDeleted = false,
+    this.category = 'Công việc',
+    this.orderIndex = 0,
+    this.project_id,
+    this.assigneeId,
+    this.attachments = const [],
+    this.reminder = 0,
   });
 }

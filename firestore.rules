@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isProjectMember(projectId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
+      return isAuthenticated() && (request.auth.uid == project.owner_id || request.auth.uid in project.memberIds);
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+      
+      // User's private tasks
+      match /tasks/{taskId} {
+        allow read, write: if isOwner(userId);
+        
+        // Time logs under user tasks
+        match /time_logs/{logId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+      
+      // User's notifications
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if isAuthenticated(); // Allow others to send notifications (e.g., project invites)
+      }
+      
+      // User's availability
+      match /availability/{availabilityId} {
+        allow read: if isAuthenticated(); // Others need to see availability for scheduling
+        allow write: if isOwner(userId);
+      }
+      
+      // User's task schedules
+      match /task_schedules/{scheduleId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Projects
+    match /projects/{projectId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.owner_id || request.auth.uid in resource.data.memberIds);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.owner_id;
+      
+      // Tasks within a shared project
+      match /tasks/{taskId} {
+        allow read, write: if isProjectMember(projectId);
+        
+        // Time logs under project tasks
+        match /time_logs/{logId} {
+          allow read, write: if isProjectMember(projectId);
+        }
+      }
+    }
+  }
+}

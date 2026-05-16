@@ -32,5 +32,5 @@ class UserAvailability extends HiveObject {
     required this.isRecurring,
     required this.day_of_week,
     required this.created_at,
-});
+  });
 }

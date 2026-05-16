@@ -38,6 +38,5 @@ class User extends HiveObject {
     required this.last_sync_at,
     required this.created_at,
     required this.updated_at,
-});
-
+  });
 }

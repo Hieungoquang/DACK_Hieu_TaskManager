@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 part 'notification_model.g.dart';
 
 @HiveType(typeId: 6)
-class Notification extends HiveObject{
+class Notification extends HiveObject {
   @HiveField(0)
   String notification_id;
   @HiveField(1)
@@ -35,5 +35,5 @@ class Notification extends HiveObject{
     required this.isRead,
     required this.created_at,
     required this.updated_at,
-});
+  });
 }

@@ -20,7 +20,5 @@ class Subtask extends HiveObject {
     required this.title,
     required this.is_completed,
     required this.created_at,
-});
-
+  });
 }
-
