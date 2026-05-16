@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AiService {
-  //OPENROUTER API KEY
-  static const String apiKey =
-      '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';
+  //OPENROUTER API KEY - Replace with your own key
+  static const String apiKey = String.fromEnvironment('OPENROUTER_API_KEY',
+      defaultValue: 'YOUR_API_KEY_HERE');
 
   // API URL
   static const String apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
