@@ -7,6 +7,9 @@ import '../models/notification_model.dart';
 import '../models/project_model.dart';
 import '../models/task_category_model.dart';
 
+import '../models/task_schedule_model.dart';
+import '../models/user_availability_model.dart';
+
 class LocalService {
   static final taskBox = Hive.box<Task>("tasksBox");
   static final logBox = Hive.box<Time_logs>("timeLogsBox");
@@ -14,6 +17,9 @@ class LocalService {
   static final notificationBox = Hive.box<Notification>("notificationsBox");
   static final projectBox = Hive.box<Project>("projectsBox");
   static final categoryBox = Hive.box<TaskCategory>("categoriesBox");
+  static final scheduleBox = Hive.box<TaskSchedule>("taskSchedulesBox");
+  static final availabilityBox = Hive.box<UserAvailability>("availabilityBox");
+  static final settingsBox = Hive.box("settingsBox");
 
   // --- Project ---
   static List<Project> getProjects(String uid) {

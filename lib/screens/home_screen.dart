@@ -17,6 +17,8 @@ import 'profile_screen.dart';
 import 'add_project_screen.dart';
 import 'task_detail_screen.dart';
 import 'procrastination_report_screen.dart';
+import '../services/progress_tracking_service.dart';
+import '../widgets/active_task_tracker_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,7 +57,18 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TaskProvider>(context, listen: false).loadTasks();
+      ProgressTrackingService.start(context, () {
+        if (mounted) {
+          Provider.of<TaskProvider>(context, listen: false).loadTasks();
+        }
+      });
     });
+  }
+
+  @override
+  void dispose() {
+    ProgressTrackingService.stop();
+    super.dispose();
   }
 
   bool _sameDay(DateTime? a, DateTime? b) {
@@ -78,6 +91,23 @@ class _HomeScreenState extends State<HomeScreen> {
     final textColor = isDark ? ghDarkText : ghLightText;
     final borderColor = isDark ? ghDarkBorder : ghLightBorder;
 
+    // Tính toán tiến độ ngày
+    final today = DateTime.now();
+    final todayTasks = provider.tasks.where((t) =>
+        t.due_day.year == today.year &&
+        t.due_day.month == today.month &&
+        t.due_day.day == today.day &&
+        !t.isDeleted).toList();
+
+    double dailyProgress = 0.0;
+    if (todayTasks.isNotEmpty) {
+      final totalProgress = todayTasks.fold<int>(0, (sum, t) => sum + t.progress);
+      dailyProgress = totalProgress / (todayTasks.length * 100);
+    }
+
+    // Lấy nhiệm vụ đang thực hiện (in_progress)
+    final activeTasks = provider.tasks.where((t) => t.status == 'in_progress' && !t.isDeleted).toList();
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: isWeb ? null : _buildMobileAppBar(isDark, textColor),
@@ -92,6 +122,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildGreeting(isDark, isWeb),
+                  const SizedBox(height: 20),
+                  _buildDailyProgressBar(isDark, dailyProgress, todayTasks.length),
+                  if (activeTasks.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    ActiveTaskTrackerWidget(
+                      task: activeTasks.first,
+                      onRefresh: () {
+                        setState(() {});
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 30),
                   _buildCrisisAlerts(isDark, provider),
                   _buildStatsGrid(isDark, provider),
@@ -1167,6 +1208,67 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDailyProgressBar(bool isDark, double progress, int taskCount) {
+    final ghGreen = const Color(0xFF3FB950);
+    final borderColor = isDark ? ghDarkBorder : ghLightBorder;
+    final cardBg = isDark ? ghDarkCard : Colors.white;
+    final subColor = isDark ? ghDarkSubText : ghLightSubText;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "TIẾN ĐỘ HÔM NAY",
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: ghGreen,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              Text(
+                "${(progress * 100).toInt()}% Hoàn thành",
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: ghGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
+              valueColor: AlwaysStoppedAnimation(ghGreen),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            taskCount > 0 
+                ? "Hôm nay bạn có $taskCount nhiệm vụ được lên lịch." 
+                : "Hôm nay không có nhiệm vụ nào được lên lịch.",
+            style: GoogleFonts.nunito(fontSize: 12, color: subColor, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

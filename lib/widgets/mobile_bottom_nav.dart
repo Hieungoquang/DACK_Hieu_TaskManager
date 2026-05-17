@@ -4,6 +4,7 @@ import '../screens/calendar_screen.dart';
 import '../screens/ai_suggestion_screen.dart';
 import '../screens/notification_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/analytics_dashboard_screen.dart';
 
 /// Thanh điều hướng phía dưới (dock) chỉ hiển thị trên mobile.
 /// Cho phép truy cập nhanh: Trang chủ, Lịch, AI, Thông báo, Cài đặt.
@@ -41,6 +42,12 @@ class MobileBottomNav extends StatelessWidget {
         icon: Icons.auto_awesome_rounded,
         label: 'AI',
         builder: () => const AiSuggestionScreen(),
+      ),
+      _NavItem(
+        route: 'analytics',
+        icon: Icons.analytics_outlined,
+        label: 'Phân tích',
+        builder: () => const AnalyticsDashboardScreen(),
       ),
       _NavItem(
         route: 'notification',

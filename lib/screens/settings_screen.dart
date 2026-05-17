@@ -100,6 +100,65 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ]),
                         const SizedBox(height: 32),
+                        _sectionTitle("CHẾ ĐỘ GIỜ NGỦ (SLEEP MODE)", textColor),
+                        _buildSettingCard(isDark, cardColor, borderColor, [
+                          _settingItem(
+                            icon: Icons.nights_stay_rounded,
+                            iconColor: ghOrange,
+                            title: "Đóng băng giờ ngủ (Sleep Freeze)",
+                            subtitle: "Tắt thông báo và đóng băng quét trễ hạn",
+                            trailing: Switch(
+                              value: appProvider.isSleepModeEnabled,
+                              activeColor: ghGreen,
+                              onChanged: (val) => appProvider.updateSleepMode(val),
+                            ),
+                          ),
+                          _divider(borderColor),
+                          _settingItem(
+                            icon: Icons.access_time_rounded,
+                            iconColor: ghBlue,
+                            title: "Khung giờ ngủ cố định",
+                            subtitle: "${appProvider.sleepStartHour.toString().padLeft(2, '0')}:${appProvider.sleepStartMinute.toString().padLeft(2, '0')} - ${appProvider.sleepEndHour.toString().padLeft(2, '0')}:${appProvider.sleepEndMinute.toString().padLeft(2, '0')}",
+                            trailing: const Icon(Icons.edit_outlined, size: 18, color: Colors.grey),
+                            onTap: () async {
+                              final startPicked = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay(hour: appProvider.sleepStartHour, minute: appProvider.sleepStartMinute),
+                                helpText: "Chọn Giờ ngủ bắt đầu",
+                              );
+                              if (startPicked != null) {
+                                if (context.mounted) {
+                                  final endPicked = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay(hour: appProvider.sleepEndHour, minute: appProvider.sleepEndMinute),
+                                    helpText: "Chọn Giờ dậy kết thúc",
+                                  );
+                                  if (endPicked != null) {
+                                    appProvider.updateSleepTime(
+                                      startPicked.hour,
+                                      startPicked.minute,
+                                      endPicked.hour,
+                                      endPicked.minute,
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                          ),
+                          _divider(borderColor),
+                          _settingItem(
+                            icon: Icons.shield_rounded,
+                            iconColor: ghGreen,
+                            title: "Số cảnh báo đã đóng băng",
+                            subtitle: "Đã bảo vệ giấc ngủ ${appProvider.silencedAlarmsCount} lần",
+                            trailing: IconButton(
+                              icon: const Icon(Icons.refresh_rounded, size: 18, color: Colors.redAccent),
+                              onPressed: () => appProvider.clearSilencedAlarms(),
+                              tooltip: "Reset thống kê",
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 32),
                         _sectionTitle("HỆ THỐNG & BẢO MẬT", textColor),
                         _buildSettingCard(isDark, cardColor, borderColor, [
                           _settingItem(

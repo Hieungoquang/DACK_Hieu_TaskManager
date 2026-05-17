@@ -60,6 +60,9 @@ void main() async {
   await Hive.openBox<model.Notification>('notificationsBox');
   await Hive.openBox<Project>('projectsBox');
   await Hive.openBox<TaskCategory>('categoriesBox');
+  await Hive.openBox<TaskSchedule>('taskSchedulesBox');
+  await Hive.openBox<UserAvailability>('availabilityBox');
+  await Hive.openBox('settingsBox');
 
   runApp(const MyApp());
 }
