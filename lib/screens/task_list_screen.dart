@@ -19,6 +19,9 @@ class _TaskListScreenState extends State<TaskListScreen> {
   final Color duoText = const Color(0xFF1F1F1F);
   final Color duoSecondaryText = const Color(0xFF4B4B4B);
 
+  String _searchQuery = '';
+  int? _selectedPriority; // null = Tất cả, 1 = Thấp, 2 = Vừa, 3 = Cao
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -63,9 +66,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
           Expanded(
             child: Consumer<TaskProvider>(
               builder: (context, taskProvider, child) {
-                if (taskProvider.tasks.isEmpty) {
-                  return _buildEmptyState(labelColor);
-                }
+                final filteredTasks = taskProvider.tasks.where((t) {
+                  final matchesSearch = t.title.toLowerCase().contains(_searchQuery.toLowerCase());
+                  final matchesPriority = _selectedPriority == null || t.priority == _selectedPriority;
+                  return matchesSearch && matchesPriority;
+                }).toList();
 
                 return Column(
                   children: [
@@ -74,7 +79,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                         padding: const EdgeInsets.only(
                           top: 30,
                           left: 40,
-                          bottom: 20,
+                          bottom: 10,
                         ),
                         child: Align(
                           alignment: Alignment.centerLeft,
@@ -89,31 +94,35 @@ class _TaskListScreenState extends State<TaskListScreen> {
                         ),
                       ),
                     ],
-                    Expanded(
-                      child: ListView.builder(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isWeb ? 40 : 20,
-                          vertical: 10,
-                        ),
-                        itemCount: taskProvider.tasks.length,
-                        itemBuilder: (context, index) {
-                          final task = taskProvider.tasks[index];
-                          return Center(
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 800),
-                              child: _buildTaskCard(
-                                context,
-                                task,
-                                taskProvider,
-                                isDark,
-                                textColor,
-                                labelColor,
+                    _buildSearchAndFilter(isDark, textColor, labelColor, isWeb),
+                    if (filteredTasks.isEmpty)
+                      Expanded(child: _buildEmptyState(labelColor))
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isWeb ? 40 : 20,
+                            vertical: 10,
+                          ),
+                          itemCount: filteredTasks.length,
+                          itemBuilder: (context, index) {
+                            final task = filteredTasks[index];
+                            return Center(
+                              child: Container(
+                                constraints: const BoxConstraints(maxWidth: 800),
+                                child: _buildTaskCard(
+                                  context,
+                                  task,
+                                  taskProvider,
+                                  isDark,
+                                  textColor,
+                                  labelColor,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
                   ],
                 );
               },
@@ -253,7 +262,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
         children: [
           const SizedBox(height: 15),
           Text(
-            "CHƯA CÓ CÔNG VIỆC NÀO",
+            "KHÔNG CÓ CÔNG VIỆC NÀO",
             style: TextStyle(
               color: labelColor,
               fontWeight: FontWeight.w900,
@@ -262,13 +271,90 @@ class _TaskListScreenState extends State<TaskListScreen> {
           ),
           const SizedBox(height: 5),
           Text(
-            "Hãy thêm công việc để bắt đầu nhé!",
+            "Chưa có công việc nào phù hợp với tìm kiếm của bạn.",
             style: TextStyle(
               color: labelColor.withOpacity(0.7),
               fontWeight: FontWeight.bold,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilter(bool isDark, Color textColor, Color labelColor, bool isWeb) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: isWeb ? 40 : 20, vertical: 10),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thanh tìm kiếm
+              Container(
+                height: 46,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF37464F) : duoGray, width: 2),
+                ),
+                child: TextField(
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    hintText: "Tìm kiếm nhiệm vụ...",
+                    hintStyle: TextStyle(color: labelColor.withOpacity(0.5), fontWeight: FontWeight.bold),
+                    prefixIcon: Icon(Icons.search, color: labelColor),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Phân loại ưu tiên
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _priorityChip("Tất cả", null, isDark, textColor),
+                    const SizedBox(width: 8),
+                    _priorityChip("Cao", 3, isDark, Colors.redAccent),
+                    const SizedBox(width: 8),
+                    _priorityChip("Vừa", 2, isDark, Colors.orange),
+                    const SizedBox(width: 8),
+                    _priorityChip("Thấp", 1, isDark, Colors.blue),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _priorityChip(String label, int? value, bool isDark, Color baseColor) {
+    final isSelected = _selectedPriority == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPriority = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? baseColor.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? baseColor : (isDark ? const Color(0xFF37464F) : duoGray),
+            width: 2,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? baseColor : (isDark ? Colors.white70 : duoSecondaryText),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }

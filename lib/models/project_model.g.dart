@@ -27,13 +27,15 @@ class ProjectAdapter extends TypeAdapter<Project> {
       memberIds: (fields[7] as List).cast<String>(),
       memberStatuses: (fields[8] as Map?)?.cast<String, String>(),
       isDeleted: fields[9] as bool,
+      startDate: fields[10] as DateTime?,
+      endDate: fields[11] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Project obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.project_id)
       ..writeByte(1)
@@ -53,7 +55,11 @@ class ProjectAdapter extends TypeAdapter<Project> {
       ..writeByte(8)
       ..write(obj.memberStatuses)
       ..writeByte(9)
-      ..write(obj.isDeleted);
+      ..write(obj.isDeleted)
+      ..writeByte(10)
+      ..write(obj.startDate)
+      ..writeByte(11)
+      ..write(obj.endDate);
   }
 
   @override

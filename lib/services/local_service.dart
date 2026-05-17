@@ -5,6 +5,7 @@ import '../models/time_logs_model.dart';
 import '../models/subtask_model.dart';
 import '../models/notification_model.dart';
 import '../models/project_model.dart';
+import '../models/task_category_model.dart';
 
 class LocalService {
   static final taskBox = Hive.box<Task>("tasksBox");
@@ -12,6 +13,7 @@ class LocalService {
   static final subtaskBox = Hive.box<Subtask>("subtasksBox");
   static final notificationBox = Hive.box<Notification>("notificationsBox");
   static final projectBox = Hive.box<Project>("projectsBox");
+  static final categoryBox = Hive.box<TaskCategory>("categoriesBox");
 
   // --- Project ---
   static List<Project> getProjects(String uid) {
@@ -34,6 +36,23 @@ class LocalService {
 
   static Future<void> updateProject(Project project) async {
     await project.save();
+  }
+
+  // --- Task Categories ---
+  static List<TaskCategory> getCategories(String uid) {
+    return categoryBox.values.where((c) => c.userId == uid).toList();
+  }
+
+  static Future<void> addCategory(TaskCategory category) async {
+    await categoryBox.put(category.id, category);
+  }
+
+  static Future<void> deleteCategory(String id) async {
+    await categoryBox.delete(id);
+  }
+
+  static Future<void> updateCategory(TaskCategory category) async {
+    await categoryBox.put(category.id, category);
   }
 
   // --- Task ---
@@ -115,5 +134,6 @@ class LocalService {
     await logBox.clear();
     await subtaskBox.clear();
     await notificationBox.clear();
+    await categoryBox.clear();
   }
 }

@@ -13,6 +13,7 @@ import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/login_screen.dart';
 import '../provider/task_provider.dart';
+import '../screens/procrastination_report_screen.dart';
 
 class WebSidebar extends StatefulWidget {
   final String currentRoute;
@@ -123,6 +124,18 @@ class _WebSidebarState extends State<WebSidebar> {
             () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const AiSuggestionScreen()),
+            ),
+          ),
+          _buildSidebarItem(
+            context,
+            Icons.psychology_alt_rounded,
+            "REALITY CHECK",
+            Colors.purpleAccent,
+            "reality_check",
+            isDark,
+            () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ProcrastinationReportScreen()),
             ),
           ),
           _buildSidebarItem(

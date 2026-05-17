@@ -60,110 +60,116 @@ class _TrashScreenState extends State<TrashScreen> {
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(isWeb ? 40 : 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isWeb)
-                    Text(
-                      'THÙNG RÁC',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                  if (isWeb) const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 18,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Thùng rác cá nhân: ${deletedProjects.length} dự án, ${deletedTasks.length} công việc',
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isWeb)
+                        Text(
+                          'THÙNG RÁC',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
                           ),
                         ),
-                        if (deletedProjects.isNotEmpty ||
-                            deletedTasks.isNotEmpty)
-                          ElevatedButton(
-                            onPressed: () => _confirmEmptyTrash(provider),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.redAccent,
-                            ),
-                            child: const Text('Xóa hết'),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  if (deletedProjects.isEmpty && deletedTasks.isEmpty)
-                    _buildEmptyState(textColor, subTextColor)
-                  else ...[
-                    if (deletedProjects.isNotEmpty) ...[
-                      Text(
-                        'Dự án đã xóa',
-                        style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                      if (isWeb) const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 18,
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Column(
-                        children: deletedProjects
-                            .map(
-                              (project) => _buildProjectCard(
-                                project,
-                                provider,
-                                cardColor,
-                                borderColor,
-                                textColor,
-                                subTextColor,
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Thùng rác cá nhân: ${deletedProjects.length} dự án, ${deletedTasks.length} công việc',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            )
-                            .toList(),
+                            ),
+                            if (deletedProjects.isNotEmpty ||
+                                deletedTasks.isNotEmpty)
+                              ElevatedButton(
+                                onPressed: () => _confirmEmptyTrash(provider),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                                child: const Text('Xóa hết'),
+                              ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 24),
+                      if (deletedProjects.isEmpty && deletedTasks.isEmpty)
+                        _buildEmptyState(textColor, subTextColor)
+                      else ...[
+                        if (deletedProjects.isNotEmpty) ...[
+                          Text(
+                            'Dự án đã xóa',
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Column(
+                            children: deletedProjects
+                                .map(
+                                  (project) => _buildProjectCard(
+                                    project,
+                                    provider,
+                                    cardColor,
+                                    borderColor,
+                                    textColor,
+                                    subTextColor,
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        if (deletedTasks.isNotEmpty) ...[
+                          Text(
+                            'Công việc đã xóa',
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Column(
+                            children: deletedTasks
+                                .map(
+                                  (task) => _buildTaskCard(
+                                    task,
+                                    provider,
+                                    cardColor,
+                                    borderColor,
+                                    textColor,
+                                    subTextColor,
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                      ],
                     ],
-                    if (deletedTasks.isNotEmpty) ...[
-                      Text(
-                        'Công việc đã xóa',
-                        style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Column(
-                        children: deletedTasks
-                            .map(
-                              (task) => _buildTaskCard(
-                                task,
-                                provider,
-                                cardColor,
-                                borderColor,
-                                textColor,
-                                subTextColor,
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
-                  ],
-                ],
+                  ),
+                ),
               ),
             ),
           ),

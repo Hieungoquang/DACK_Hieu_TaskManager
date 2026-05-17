@@ -81,7 +81,7 @@ class AuthService {
         case 'email-already-in-use':
           return "Email này đã được sử dụng bởi tài khoản khác.";
         case 'invalid-email':
-          return "Định dạng email không hợp lệ.";
+          return "Email không hợp lệ, không được sử dụng!";
         case 'weak-password':
           return "Mật khẩu quá yếu (tối thiểu 6 ký tự).";
         case 'network-request-failed':

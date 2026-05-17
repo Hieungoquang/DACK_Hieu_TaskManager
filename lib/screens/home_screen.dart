@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../provider/task_provider.dart';
 import '../provider/app_provider.dart';
@@ -15,6 +16,7 @@ import 'project_board_screen.dart';
 import 'profile_screen.dart';
 import 'add_project_screen.dart';
 import 'task_detail_screen.dart';
+import 'procrastination_report_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _miniMonth = DateTime.now();
   DateTime _selectedDay = DateTime.now();
   bool _isStatsExpanded = true;
+  String _taskSearchQuery = '';
+  int? _selectedTaskPriority;
 
   // GitHub Style Colors
   static const Color ghDarkBg = Color(0xFF0D1117);
@@ -89,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildGreeting(isDark, isWeb),
                   const SizedBox(height: 30),
+                  _buildCrisisAlerts(isDark, provider),
                   _buildStatsGrid(isDark, provider),
                   const SizedBox(height: 30),
                   if (isWeb)
@@ -137,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
       elevation: 0,
       title: Text(
         "TASKFLOW",
-        style: TextStyle(
+        style: GoogleFonts.nunito(
           color: ghGreen,
           fontWeight: FontWeight.bold,
           letterSpacing: 2,
@@ -173,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Text(
           '$greet, $displayName!',
-          style: TextStyle(
+          style: GoogleFonts.nunito(
             fontSize: isWeb ? 34 : 26,
             fontWeight: FontWeight.bold,
             color: textColor,
@@ -182,8 +187,82 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 6),
         Text(
           'Hôm nay là ngày ${now.day}/${now.month}/${now.year}',
-          style: TextStyle(fontSize: 16, color: subColor),
+          style: GoogleFonts.nunito(fontSize: 16, color: subColor),
         ),
+      ],
+    );
+  }
+
+  Widget _buildCrisisAlerts(bool isDark, TaskProvider provider) {
+    final crisisTasks = provider.crisisTasks;
+    if (crisisTasks.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 8),
+            Text(
+              "CẢNH BÁO KHỦNG HOẢNG DEADLINE",
+              style: GoogleFonts.nunito(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.redAccent,
+                letterSpacing: 1.1,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withOpacity(isDark ? 0.1 : 0.05),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: crisisTasks.map((t) {
+              final prob = provider.crisisProbabilities[t.task_id] ?? 0.0;
+              final percent = (prob * 100).toInt();
+              return ListTile(
+                onTap: () => _openTask(t),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.timer_off, color: Colors.redAccent, size: 20),
+                ),
+                title: Text(
+                  t.title,
+                  style: GoogleFonts.nunito(
+                    color: isDark ? ghDarkText : ghLightText,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                subtitle: Text(
+                  "Nguy cơ trễ hạn: $percent%",
+                  style: GoogleFonts.nunito(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: isDark ? ghDarkSubText : ghLightSubText,
+                  size: 20,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 30),
       ],
     );
   }
@@ -202,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               "THỐNG KÊ",
-              style: TextStyle(
+              style: GoogleFonts.nunito(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: isDark ? ghDarkText : ghLightText,
@@ -214,7 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     _isStatsExpanded ? "Thu gọn" : "Mở rộng",
-                    style: TextStyle(
+                    style: GoogleFonts.nunito(
                       fontSize: 14,
                       color: isDark ? ghDarkSubText : ghLightSubText,
                     ),
@@ -246,8 +325,82 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildStatCard("Đang chờ", pending, Colors.redAccent, isDark),
             ],
           ),
+          const SizedBox(height: 16),
+          _buildRealityCheckBanner(isDark),
         ],
       ],
+    );
+  }
+
+  Widget _buildRealityCheckBanner(bool isDark) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ProcrastinationReportScreen()),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [const Color(0xFF3B154C), const Color(0xFF1F0B2D)]
+                : [const Color(0xFFF2E6FF), const Color(0xFFE5CCFF)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? const Color(0xFF6B2D8C) : const Color(0xFFCC99FF),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.psychology_alt_rounded, color: Colors.purpleAccent, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "REALITY CHECK 🧐",
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.purpleAccent : const Color(0xFF6B2D8C),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Xem phân tích xu hướng trì hoãn và phản hồi thực tế từ AI Coach.",
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? ghDarkText : ghLightText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: isDark ? Colors.purpleAccent : const Color(0xFF6B2D8C),
+              size: 14,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -272,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: GoogleFonts.nunito(
               fontSize: 14,
               color: isDark ? ghDarkSubText : ghLightSubText,
               fontWeight: FontWeight.bold,
@@ -283,7 +436,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text(
                 '$value',
-                style: TextStyle(
+                style: GoogleFonts.nunito(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: color,
@@ -307,6 +460,7 @@ class _HomeScreenState extends State<HomeScreen> {
     TaskProvider provider,
     Color borderColor,
   ) {
+    final textColor = isDark ? ghDarkText : ghLightText;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -334,10 +488,82 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         const SizedBox(height: 40),
-        _buildSectionHeader("NHIỆM VỤ GẦN ĐÂY", null, isDark),
+        _buildSectionHeader("NHIỆM VỤ", null, isDark),
+        const SizedBox(height: 16),
+        _buildSearchAndFilterTasks(isDark, textColor, isDark ? ghDarkSubText : ghLightSubText),
         const SizedBox(height: 16),
         _buildRecentTasksList(isDark, provider, borderColor),
       ],
+    );
+  }
+
+  Widget _buildSearchAndFilterTasks(bool isDark, Color textColor, Color labelColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Thanh tìm kiếm
+        Container(
+          height: 46,
+          decoration: BoxDecoration(
+            color: isDark ? ghDarkCard : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? ghDarkBorder : ghLightBorder),
+          ),
+          child: TextField(
+            onChanged: (val) => setState(() => _taskSearchQuery = val),
+            style: GoogleFonts.nunito(color: textColor, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              hintText: "Tìm kiếm nhiệm vụ...",
+              hintStyle: GoogleFonts.nunito(color: labelColor.withOpacity(0.5), fontWeight: FontWeight.bold),
+              prefixIcon: Icon(Icons.search, color: labelColor),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Phân loại ưu tiên
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _priorityChip("Tất cả", null, isDark),
+              const SizedBox(width: 8),
+              _priorityChip("Cao", 3, isDark, color: Colors.redAccent),
+              const SizedBox(width: 8),
+              _priorityChip("Vừa", 2, isDark, color: ghOrange),
+              const SizedBox(width: 8),
+              _priorityChip("Thấp", 1, isDark, color: ghBlue),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _priorityChip(String label, int? value, bool isDark, {Color? color}) {
+    final isSelected = _selectedTaskPriority == value;
+    final baseColor = color ?? (isDark ? ghDarkText : ghLightText);
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTaskPriority = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? baseColor.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? baseColor : (isDark ? ghDarkBorder : ghLightBorder),
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.nunito(
+            color: isSelected ? baseColor : (isDark ? ghDarkSubText : ghLightSubText),
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+      ),
     );
   }
 
@@ -349,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildMiniCalendar(isDark, borderColor),
+        _buildMiniCalendar(isDark, borderColor, provider),
         const SizedBox(height: 30),
         _buildTaskStatsChart(isDark, provider, borderColor),
       ],
@@ -363,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Text(
           title,
-          style: TextStyle(
+          style: GoogleFonts.nunito(
             color: textColor,
             fontWeight: FontWeight.bold,
             fontSize: 14,
@@ -414,7 +640,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         title: Text(
           p.name,
-          style: TextStyle(
+          style: GoogleFonts.nunito(
             color: isDark ? ghDarkText : ghLightText,
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -428,7 +654,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   "${tasks.length} nhiệm vụ",
-                  style: TextStyle(
+                  style: GoogleFonts.nunito(
                     fontSize: 13,
                     color: isDark ? ghDarkSubText : ghLightSubText,
                   ),
@@ -443,7 +669,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 10),
                 Text(
                   "${(progress * 100).toInt()}%",
-                  style: TextStyle(
+                  style: GoogleFonts.nunito(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: ghGreen,
@@ -461,6 +687,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 minHeight: 4,
               ),
             ),
+            if (p.startDate != null || p.endDate != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today_outlined, size: 11, color: isDark ? ghDarkSubText : ghLightSubText),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _getProjectTimelineShort(p),
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        color: isDark ? ghDarkSubText : ghLightSubText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
         trailing: Icon(
@@ -477,7 +723,15 @@ class _HomeScreenState extends State<HomeScreen> {
     TaskProvider provider,
     Color borderColor,
   ) {
-    final tasks = provider.tasks.take(5).toList();
+    final filteredTasks = provider.tasks.where((t) {
+      final matchSearch = t.title.toLowerCase().contains(_taskSearchQuery.toLowerCase());
+      final matchPriority = _selectedTaskPriority == null || t.priority == _selectedTaskPriority;
+      return matchSearch && matchPriority;
+    }).toList();
+
+    // Giới hạn 5 task gần nhất nếu không có tìm kiếm, ngược lại hiển thị kết quả tìm kiếm (tối đa 20)
+    final isFiltering = _taskSearchQuery.isNotEmpty || _selectedTaskPriority != null;
+    final tasks = isFiltering ? filteredTasks.take(20).toList() : filteredTasks.take(5).toList();
     final cardColor = isDark ? ghDarkCard : Colors.white;
 
     return Container(
@@ -496,6 +750,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   Divider(color: borderColor, height: 1),
               itemBuilder: (context, index) {
                 final t = tasks[index];
+                bool isProject = t.project_id != null && t.project_id!.isNotEmpty;
+                String groupName = t.category;
+                if (isProject) {
+                  try {
+                    groupName = provider.projects.firstWhere((p) => p.project_id == t.project_id).name;
+                  } catch (_) {
+                    groupName = "Dự án";
+                  }
+                }
+
                 return ListTile(
                   onTap: () => _openTask(t),
                   leading: Icon(
@@ -513,17 +777,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   title: Text(
                     t.title,
-                    style: TextStyle(
+                    style: GoogleFonts.nunito(
                       color: isDark ? ghDarkText : ghLightText,
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
                     ),
                   ),
-                  subtitle: Text(
-                    DateFormat('dd MMM').format(t.due_day),
-                    style: TextStyle(
-                      color: isDark ? ghDarkSubText : ghLightSubText,
-                      fontSize: 13,
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 12, color: isDark ? ghDarkSubText : ghLightSubText),
+                        const SizedBox(width: 4),
+                        Text(
+                          "${t.due_day.day} Thg ${t.due_day.month}, ${t.due_day.year}",
+                          style: GoogleFonts.nunito(
+                            color: isDark ? ghDarkSubText : ghLightSubText,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          isProject ? Icons.domain : Icons.person,
+                          size: 12,
+                          color: isProject ? Colors.redAccent : ghBlue,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            groupName,
+                            style: GoogleFonts.nunito(
+                              color: isProject ? Colors.redAccent : ghBlue,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   trailing: Icon(
@@ -552,7 +844,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMiniCalendar(bool isDark, Color borderColor) {
+  Widget _buildMiniCalendar(bool isDark, Color borderColor, TaskProvider provider) {
+    final tasksForSelectedDay = provider.tasks.where((t) => _sameDay(t.due_day, _selectedDay)).toList();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -561,13 +855,14 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border.all(color: borderColor),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 "THÁNG ${_miniMonth.month}/${_miniMonth.year}",
-                style: TextStyle(
+                style: GoogleFonts.nunito(
                   fontWeight: FontWeight.bold,
                   color: isDark ? ghDarkText : ghLightText,
                   fontSize: 15,
@@ -599,6 +894,85 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           _buildCalendarGrid(isDark),
+          const SizedBox(height: 16),
+          Divider(color: borderColor),
+          const SizedBox(height: 8),
+          Text(
+            "CÔNG VIỆC NGÀY ${_selectedDay.day}/${_selectedDay.month}",
+            style: GoogleFonts.nunito(
+              fontWeight: FontWeight.bold,
+              color: isDark ? ghDarkSubText : ghLightSubText,
+              fontSize: 13,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (tasksForSelectedDay.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 16),
+              child: Center(
+                child: Text(
+                  "Không có công việc nào",
+                  style: GoogleFonts.nunito(
+                    color: isDark ? ghDarkSubText : ghLightSubText,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: tasksForSelectedDay.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final t = tasksForSelectedDay[index];
+                return InkWell(
+                  onTap: () => _openTask(t),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: t.priority == 3
+                              ? Colors.redAccent
+                              : (t.priority == 2 ? ghOrange : ghBlue),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.title,
+                              style: GoogleFonts.nunito(
+                                color: isDark ? ghDarkText : ghLightText,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                decoration: t.status == 'completed' ? TextDecoration.lineThrough : null,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              t.status == 'completed' ? "Đã xong" : (t.status == 'in_progress' ? "Đang làm" : "Đang chờ"),
+                              style: GoogleFonts.nunito(
+                                color: isDark ? ghDarkSubText : ghLightSubText,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );
@@ -643,7 +1017,7 @@ class _HomeScreenState extends State<HomeScreen> {
               alignment: Alignment.center,
               child: Text(
                 "${day.day}",
-                style: TextStyle(
+                style: GoogleFonts.nunito(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: isToday
@@ -683,7 +1057,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Text(
             "HOẠT ĐỘNG",
-            style: TextStyle(
+            style: GoogleFonts.nunito(
               color: isDark ? ghDarkSubText : ghLightSubText,
               fontWeight: FontWeight.bold,
               fontSize: 14,
@@ -759,7 +1133,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 10),
           Text(
             label,
-            style: TextStyle(
+            style: GoogleFonts.nunito(
               fontSize: 13,
               color: isDark ? ghDarkSubText : ghLightSubText,
               fontWeight: FontWeight.w500,
@@ -786,7 +1160,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 10),
             Text(
               message,
-              style: TextStyle(
+              style: GoogleFonts.nunito(
                 color: isDark ? ghDarkSubText : ghLightSubText,
                 fontSize: 14,
               ),
@@ -795,5 +1169,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  String _getProjectTimelineShort(Project p) {
+    final start = p.startDate;
+    final end = p.endDate;
+    final fmt = DateFormat('dd/MM/yyyy HH:mm');
+
+    if (start != null && end != null) {
+      return "${fmt.format(start)} - ${fmt.format(end)}";
+    } else if (start != null) {
+      return "Từ: ${fmt.format(start)}";
+    } else if (end != null) {
+      return "Đến: ${fmt.format(end)}";
+    }
+    return "";
   }
 }

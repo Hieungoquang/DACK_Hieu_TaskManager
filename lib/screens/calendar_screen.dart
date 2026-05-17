@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:syncfusion_flutter_calendar/calendar.dart';
 import '../models/task_model.dart';
+import '../models/task_category_model.dart';
 import '../provider/task_provider.dart';
 import '../provider/app_provider.dart';
 import '../widgets/web_sidebar.dart';
 import '../widgets/mobile_bottom_nav.dart';
-import 'add_project_screen.dart';
 import 'task_detail_screen.dart';
 import '../widgets/quick_add_task_dialog.dart';
 import '../widgets/quick_edit_task_dialog.dart';
 import '../widgets/app_popup.dart';
-import '../services/calendar_import_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -22,14 +24,15 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _selectedDay = DateTime.now();
-  DateTime _miniMonth = DateTime.now();
   String _viewMode = 'week';
-  final ScrollController _scroll = ScrollController();
+  final CalendarController _calendarController = CalendarController();
+  late final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _showFilterPanel = true; // toggle panel lọc (chỉ dùng cho web)
 
-  // Filter states
+  // Filter states: Checked means visible
   List<String> _selectedProjectIds = [];
-  List<String> _selectedCategories = [];
-  bool _showFilters = true;
+  List<String> _selectedCategoryIds = [];
+  bool _showUncategorized = true;
 
   // GitHub Style Colors
   static const Color ghDarkBg = Color(0xFF0D1117);
@@ -39,72 +42,52 @@ class _CalendarScreenState extends State<CalendarScreen> {
   static const Color ghDarkSubText = Color(0xFF8B949E);
 
   static const Color ghLightBg = Color(0xFFF6F8FA);
-  static const Color ghLightCard = Color(0xFFFFFFFF);
   static const Color ghLightBorder = Color(0xFFD0D7DE);
   static const Color ghLightText = Color(0xFF24292F);
-  static const Color ghLightSubText = Color(0xFF57606A);
-
   static const Color ghBlue = Color(0xFF58A6FF);
   static const Color ghGreen = Color(0xFF3FB950);
-  static const Color ghOrange = Color(0xFFD29922);
-  static const Color ghPurple = Color(0xFFA371F7);
-
-  static const double _hh = 70.0; // Increased height for larger text
-
   @override
   void initState() {
     super.initState();
+    _calendarController.view = CalendarView.week;
+    _calendarController.displayDate = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final h = DateTime.now().hour;
-      if (_scroll.hasClients) {
-        _scroll.animateTo(
-          (h - 1).clamp(0, 22) * _hh,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOut,
-        );
-      }
+      final provider = Provider.of<TaskProvider>(context, listen: false);
+      setState(() {
+        _selectedProjectIds =
+            provider.projects.map((p) => p.project_id).toList();
+        _selectedCategoryIds = provider.categories.map((c) => c.id).toList();
+      });
     });
   }
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _calendarController.dispose();
     super.dispose();
   }
 
-  bool _same(DateTime? a, DateTime? b) {
-    if (a == null || b == null) return false;
-    try {
-      return a.year == b.year && a.month == b.month && a.day == b.day;
-    } catch (e) {
-      return false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = Provider.of<TaskProvider>(context, listen: false);
+    final currentProjectIds =
+        provider.projects.map((p) => p.project_id).toSet();
+    final currentCategoryIds = provider.categories.map((c) => c.id).toSet();
+
+    // Auto-select newly added projects/categories
+    final newProjectIds =
+        currentProjectIds.difference(_selectedProjectIds.toSet());
+    final newCategoryIds =
+        currentCategoryIds.difference(_selectedCategoryIds.toSet());
+
+    if (newProjectIds.isNotEmpty || newCategoryIds.isNotEmpty) {
+      setState(() {
+        _selectedProjectIds.addAll(newProjectIds);
+        _selectedCategoryIds.addAll(newCategoryIds);
+      });
     }
   }
-
-  List<DateTime> _weekOf(DateTime d) {
-    final mon = d.subtract(Duration(days: d.weekday - 1));
-    return List.generate(7, (i) => mon.add(Duration(days: i)));
-  }
-
-  List<Task> _forDay(DateTime d, List<Task> all) =>
-      all.where((t) => _same(t.due_day, d)).toList();
-
-  Color _taskColor(int p) => p == 3
-      ? Colors.redAccent
-      : p == 2
-          ? ghOrange
-          : ghBlue;
-
-  String _fmtHM(DateTime? d) => d == null ? "" : DateFormat('HH:mm').format(d);
-  String _fmtDHM(DateTime? d) =>
-      d == null ? "" : DateFormat('dd/MM/yyyy HH:mm').format(d);
-
-  double _nowY() {
-    final now = DateTime.now();
-    return now.hour * _hh + now.minute * _hh / 60;
-  }
-
-  double _taskY(Task t) => t.due_day.hour * _hh + t.due_day.minute * _hh / 60;
 
   void _prev() {
     setState(() {
@@ -112,22 +95,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _selectedDay = _selectedDay.subtract(const Duration(days: 1));
       } else if (_viewMode == 'week') {
         _selectedDay = _selectedDay.subtract(const Duration(days: 7));
-      } else if (_viewMode == 'month') {
-        _miniMonth = DateTime(_miniMonth.year, _miniMonth.month - 1);
-      } else if (_viewMode == 'year') {
-        _miniMonth = DateTime(_miniMonth.year - 1, _miniMonth.month);
+      } else {
+        _selectedDay = DateTime(_selectedDay.year, _selectedDay.month - 1);
       }
-      if (_viewMode != 'month' && _viewMode != 'year') {
-        _miniMonth = _selectedDay;
-      }
+      _calendarController.displayDate = _selectedDay;
     });
-    if (_scroll.hasClients) {
-      _scroll.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
   }
 
   void _next() {
@@ -136,21 +108,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _selectedDay = _selectedDay.add(const Duration(days: 1));
       } else if (_viewMode == 'week') {
         _selectedDay = _selectedDay.add(const Duration(days: 7));
-      } else if (_viewMode == 'month') {
-        _miniMonth = DateTime(_miniMonth.year, _miniMonth.month + 1);
-      } else if (_viewMode == 'year') {
-        _miniMonth = DateTime(_miniMonth.year + 1, _miniMonth.month);
+      } else {
+        _selectedDay = DateTime(_selectedDay.year, _selectedDay.month + 1);
       }
-      if (_viewMode != 'month' && _viewMode != 'year') {
-        _miniMonth = _selectedDay;
-      }
+      _calendarController.displayDate = _selectedDay;
     });
-    if (_scroll.hasClients) {
-      _scroll.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+  }
+
+  CalendarView _getCalendarView() {
+    switch (_viewMode) {
+      case 'day':
+        return CalendarView.day;
+      case 'month':
+        return CalendarView.month;
+      case 'week':
+      default:
+        return CalendarView.week;
     }
   }
 
@@ -159,27 +132,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final appProvider = Provider.of<AppProvider>(context);
     final isDark = appProvider.themeMode == ThemeMode.dark;
     final isWeb = MediaQuery.of(context).size.width > 900;
+    final provider = context.watch<TaskProvider>();
 
     final bgColor = isDark ? ghDarkBg : ghLightBg;
     final textColor = isDark ? ghDarkText : ghLightText;
     final borderColor = isDark ? ghDarkBorder : ghLightBorder;
 
-    final provider = context.watch<TaskProvider>();
-    final allTasks = provider.tasks;
+    final filteredTasks = provider.tasks.where((t) {
+      final hasProject = t.project_id != null && t.project_id!.isNotEmpty;
+      final hasCategory = t.categoryId != null && t.categoryId!.isNotEmpty;
 
-    // Apply filters
-    final filteredTasks = allTasks.where((t) {
-      bool projectMatch = _selectedProjectIds.isEmpty ||
-          _selectedProjectIds.contains(t.project_id);
-      bool categoryMatch = _selectedCategories.isEmpty ||
-          _selectedCategories.contains(t.category);
-      return projectMatch && categoryMatch;
+      if (hasProject && hasCategory) {
+        return _selectedProjectIds.contains(t.project_id) ||
+            _selectedCategoryIds.contains(t.categoryId);
+      }
+      if (hasProject) {
+        return _selectedProjectIds.contains(t.project_id);
+      }
+      if (hasCategory) {
+        return _selectedCategoryIds.contains(t.categoryId);
+      }
+      return _showUncategorized;
     }).toList();
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: bgColor,
+      drawer: !isWeb ? Drawer(
+        backgroundColor: bgColor,
+        child: SafeArea(child: _buildLeftPanel(isDark, borderColor, provider, isWeb)),
+      ) : null,
       bottomNavigationBar:
-          isWeb ? null : MobileBottomNav(currentRoute: 'calendar'),
+          isWeb ? null : const MobileBottomNav(currentRoute: 'calendar'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showDialog(
           context: context,
@@ -198,19 +182,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      if (isWeb)
-                        _buildLeftPanel(
-                          isDark,
-                          borderColor,
-                          textColor,
-                          provider,
-                        ),
+                      // Panel lọc nội tuyến — chỉ hiển thị trên web khi bật
+                      if (isWeb && _showFilterPanel)
+                        _buildLeftPanel(isDark, borderColor, provider, isWeb),
                       Expanded(
                         child: _buildMainView(
                           isDark,
                           filteredTasks,
                           borderColor,
                           textColor,
+                          provider,
                         ),
                       ),
                     ],
@@ -231,686 +212,691 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Color borderColor,
   ) {
     String label;
-    if (_viewMode == 'month') {
-      label = "Tháng ${DateFormat('MM/yyyy').format(_miniMonth)}";
-    } else if (_viewMode == 'year') {
-      label = "Năm ${_miniMonth.year}";
-    } else {
-      label = "Tháng ${DateFormat('MM/yyyy').format(_selectedDay)}";
+    switch (_viewMode) {
+      case 'month':
+        label = DateFormat('MM/yyyy').format(_selectedDay);
+        break;
+      case 'day':
+        label = DateFormat('dd/MM/yyyy').format(_selectedDay);
+        break;
+      case 'week':
+        final start =
+            _selectedDay.subtract(Duration(days: _selectedDay.weekday - 1));
+        final end = start.add(const Duration(days: 6));
+        label =
+            "${DateFormat('dd/MM').format(start)} - ${DateFormat('dd/MM').format(end)}";
+        break;
+      default:
+        label = DateFormat('MM/yyyy').format(_selectedDay);
     }
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      padding: EdgeInsets.symmetric(
-        horizontal: isWeb ? 20 : 8,
-        vertical: isWeb ? 12 : 6,
-      ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
+        color: isDark ? ghDarkBg : ghLightBg,
         border: Border(bottom: BorderSide(color: borderColor)),
       ),
-      child: Builder(
-        builder: (context) => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              if (isWeb)
-                PopupMenuButton<String>(
-                  icon:
-                      Icon(Icons.menu, color: textColor, size: isWeb ? 24 : 22),
-                  padding: EdgeInsets.zero,
-                  onSelected: (value) {
-                    if (value == 'day' ||
-                        value == 'week' ||
-                        value == 'month' ||
-                        value == 'year') {
-                      setState(() => _viewMode = value);
-                    } else if (value == 'toggle_filters') {
-                      setState(() => _showFilters = !_showFilters);
-                    } else if (value == 'clear_filters') {
-                      setState(() {
-                        _selectedProjectIds = [];
-                        _selectedCategories = [];
-                      });
-                    } else if (value.startsWith('category_')) {
-                      final category = value.replaceFirst('category_', '');
-                      setState(() {
-                        if (_selectedCategories.contains(category)) {
-                          _selectedCategories.remove(category);
-                        } else {
-                          _selectedCategories.add(category);
-                        }
-                      });
-                    } else if (value.startsWith('project_')) {
-                      final projectId = value.replaceFirst('project_', '');
-                      setState(() {
-                        if (_selectedProjectIds.contains(projectId)) {
-                          _selectedProjectIds.remove(projectId);
-                        } else {
-                          _selectedProjectIds.add(projectId);
-                        }
-                      });
-                    }
-                  },
-                  itemBuilder: (context) {
-                    final categories = [
-                      'Công việc',
-                      'Cá nhân',
-                      'Học tập',
-                      'Khác'
-                    ];
-                    final provider =
-                        Provider.of<TaskProvider>(context, listen: false);
-                    final projects = provider.projects;
-
-                    return [
-                      const PopupMenuItem(
-                        value: 'day',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo ngày'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'week',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_view_week, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo tuần'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'month',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_month, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo tháng'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'year',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_view_month, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo năm'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        enabled: false,
-                        child: Text(
-                          'Lọc theo danh mục',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                      ...categories.map((category) => PopupMenuItem(
-                            value: 'category_$category',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _selectedCategories.contains(category)
-                                      ? Icons.check_box
-                                      : Icons.check_box_outline_blank,
-                                  size: 18,
-                                ),
-                                SizedBox(width: 12),
-                                Text(category),
-                              ],
-                            ),
-                          )),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        enabled: false,
-                        child: Text(
-                          'Lọc theo dự án',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                      ...projects.map((project) => PopupMenuItem(
-                            value: 'project_${project.project_id}',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _selectedProjectIds
-                                          .contains(project.project_id)
-                                      ? Icons.check_box
-                                      : Icons.check_box_outline_blank,
-                                  size: 18,
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    project.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
-                      const PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: 'clear_filters',
-                        child: Row(
-                          children: [
-                            Icon(Icons.clear_all, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xóa bộ lọc'),
-                          ],
-                        ),
-                      ),
-                    ];
-                  },
-                ),
-              if (!isWeb)
-                IconButton(
-                  icon: Icon(Icons.arrow_back, color: textColor, size: 22),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => Navigator.pop(context),
-                ),
-              Flexible(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: isWeb ? 18 : 14,
-                    letterSpacing: 1.0,
+      child: Row(
+        children: [
+          // Nút toggle panel lọc
+          if (isWeb)
+            IconButton(
+              icon: Icon(
+                _showFilterPanel ? Icons.filter_list_off : Icons.filter_list,
+                color: _showFilterPanel ? ghBlue : textColor,
+                size: 22,
+              ),
+              tooltip: _showFilterPanel ? "Ẩn bảng lọc" : "Mở bảng lọc",
+              onPressed: () => setState(() => _showFilterPanel = !_showFilterPanel),
+            )
+          else
+            IconButton(
+              icon: Icon(Icons.menu, color: textColor, size: 24),
+              tooltip: "Mở bảng lọc",
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
+          if (!isWeb)
+            IconButton(
+              icon: Icon(Icons.arrow_back, color: textColor, size: 22),
+              onPressed: () => Navigator.pop(context),
+            ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showViewMenu(isDark),
+              child: Row(
+                children: [
+                  Text(
+                    label.toUpperCase(),
+                    style: GoogleFonts.nunito(
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.arrow_drop_down, color: textColor, size: 20),
+                ],
               ),
-              IconButton(
-                icon: Icon(Icons.chevron_left, size: isWeb ? 24 : 22),
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                onPressed: _prev,
-              ),
-              IconButton(
-                icon: Icon(Icons.chevron_right, size: isWeb ? 24 : 22),
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                onPressed: _next,
-              ),
-              IconButton(
-                icon: const Icon(Icons.upload),
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                onPressed: () async {
-                  final events = await CalendarImportService.importICS();
-                  if (events.isEmpty) {
-                    if (mounted) {
-                      AppPopup.show(
-                        context,
-                        title: 'Import thất bại',
-                        message:
-                            'Không thể import file ICS. Vui lòng kiểm tra lại.',
-                        color: ghOrange,
-                        icon: Icons.error,
-                      );
-                    }
-                    return;
-                  }
+            ),
+          ),
+          // Chế độ xem nhanh
+          _viewChip('N', 'day', isDark),
+          _viewChip('T', 'week', isDark),
+          _viewChip('M', 'month', isDark),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: Icon(Icons.chevron_left_rounded, color: textColor, size: 28),
+            onPressed: _prev,
+          ),
+          IconButton(
+            icon: Icon(Icons.chevron_right_rounded, color: textColor, size: 28),
+            onPressed: _next,
+          ),
+        ],
+      ),
+    );
+  }
 
-                  if (!mounted) return;
-                  final provider =
-                      Provider.of<TaskProvider>(context, listen: false);
-                  int importedCount = 0;
-                  int skippedCount = 0;
-
-                  for (var event in events) {
-                    final start = event['start'] as DateTime?;
-                    final end = event['end'] as DateTime?;
-                    if (start == null || end == null) {
-                      skippedCount++;
-                      continue;
-                    }
-
-                    final duration = end.difference(start).inMinutes;
-
-                    final task = Task(
-                      task_id: const Uuid().v4(),
-                      user_id: 'current_user',
-                      title: event['title'] as String? ?? 'Không có tiêu đề',
-                      description: event['description'] as String? ?? '',
-                      due_day: start,
-                      deadline: end,
-                      duration: duration,
-                      priority: event['priority'] as int? ?? 1,
-                      status: 'pending',
-                      progress: 0,
-                      category: event['category'] as String? ?? 'Công việc',
-                      createdAt: DateTime.now(),
-                      updatedAt: DateTime.now(),
-                      isSynced: false,
-                    );
-
-                    await provider.addTask(task);
-                    importedCount++;
-                  }
-
-                  if (mounted) {
-                    String message =
-                        'Đã import thành công $importedCount công việc từ lịch';
-                    if (skippedCount > 0) {
-                      message +=
-                          '\n(Bỏ qua $skippedCount công việc không hợp lệ)';
-                    }
-
-                    AppPopup.show(
-                      context,
-                      title: 'Đã import',
-                      message: message,
-                      color: ghGreen,
-                      icon: Icons.check_circle,
-                    );
-                  }
-                },
-              ),
-              if (!isWeb)
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.menu, color: textColor, size: 22),
-                  padding: EdgeInsets.zero,
-                  onSelected: (value) {
-                    if (value == 'day' ||
-                        value == 'week' ||
-                        value == 'month' ||
-                        value == 'year') {
-                      setState(() => _viewMode = value);
-                    } else if (value == 'toggle_filters') {
-                      setState(() => _showFilters = !_showFilters);
-                    } else if (value == 'clear_filters') {
-                      setState(() {
-                        _selectedProjectIds = [];
-                        _selectedCategories = [];
-                      });
-                    } else if (value.startsWith('category_')) {
-                      final category = value.replaceFirst('category_', '');
-                      setState(() {
-                        if (_selectedCategories.contains(category)) {
-                          _selectedCategories.remove(category);
-                        } else {
-                          _selectedCategories.add(category);
-                        }
-                      });
-                    } else if (value.startsWith('project_')) {
-                      final projectId = value.replaceFirst('project_', '');
-                      setState(() {
-                        if (_selectedProjectIds.contains(projectId)) {
-                          _selectedProjectIds.remove(projectId);
-                        } else {
-                          _selectedProjectIds.add(projectId);
-                        }
-                      });
-                    }
-                  },
-                  itemBuilder: (context) {
-                    final categories = [
-                      'Công việc',
-                      'Cá nhân',
-                      'Học tập',
-                      'Khác'
-                    ];
-                    final provider =
-                        Provider.of<TaskProvider>(context, listen: false);
-                    final projects = provider.projects;
-
-                    return [
-                      const PopupMenuItem(
-                        value: 'day',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo ngày'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'week',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_view_week, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo tuần'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'month',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_month, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo tháng'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'year',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_view_month, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xem theo năm'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        enabled: false,
-                        child: Text(
-                          'Lọc theo danh mục',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                      ...categories.map((category) => PopupMenuItem(
-                            value: 'category_$category',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _selectedCategories.contains(category)
-                                      ? Icons.check_box
-                                      : Icons.check_box_outline_blank,
-                                  size: 18,
-                                ),
-                                SizedBox(width: 12),
-                                Text(category),
-                              ],
-                            ),
-                          )),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        enabled: false,
-                        child: Text(
-                          'Lọc theo dự án',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                      ...projects.map((project) => PopupMenuItem(
-                            value: 'project_${project.project_id}',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _selectedProjectIds
-                                          .contains(project.project_id)
-                                      ? Icons.check_box
-                                      : Icons.check_box_outline_blank,
-                                  size: 18,
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    project.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
-                      const PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: 'clear_filters',
-                        child: Row(
-                          children: [
-                            Icon(Icons.clear_all, size: 18),
-                            SizedBox(width: 12),
-                            Text('Xóa bộ lọc'),
-                          ],
-                        ),
-                      ),
-                    ];
-                  },
-                ),
-            ],
+  Widget _viewChip(String label, String mode, bool isDark) {
+    final isActive = _viewMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _viewMode = mode;
+          _calendarController.view = _getCalendarViewForMode(mode);
+          _calendarController.displayDate = _selectedDay;
+        });
+      },
+      child: Container(
+        width: 28,
+        height: 28,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: isActive ? ghBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: isActive ? null : Border.all(color: ghDarkBorder, width: 1),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.nunito(
+              color: isActive ? Colors.white : (isDark ? ghDarkSubText : ghLightText),
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildLeftPanel(
-    bool isDark,
-    Color borderColor,
-    Color textColor,
-    TaskProvider provider,
-  ) {
-    return Container(
-      width: 280,
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: borderColor)),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  void _showViewMenu(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? ghDarkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          "Chế độ hiển thị",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: _buildMiniCalendar(isDark),
-            ),
-            const Divider(height: 1),
-            _buildFilterSection(
-              "DỰ ÁN CỦA TÔI",
-              provider.projects
-                  .map(
-                    (p) => {
-                      'id': p.project_id,
-                      'label': p.name,
-                      'color': ghBlue,
-                    },
-                  )
-                  .toList(),
-              _selectedProjectIds,
-              (id) {
-                setState(() {
-                  if (_selectedProjectIds.contains(id)) {
-                    _selectedProjectIds.remove(id);
-                  } else {
-                    _selectedProjectIds.add(id);
-                  }
-                });
-              },
-              isDark,
-            ),
-            const Divider(height: 1),
-            _buildFilterSection(
-              "DANH MỤC",
-              [
-                {'id': 'Công việc', 'label': 'Công việc', 'color': ghOrange},
-                {'id': 'Cá nhân', 'label': 'Cá nhân', 'color': ghGreen},
-                {'id': 'Học tập', 'label': 'Học tập', 'color': ghPurple},
-              ],
-              _selectedCategories,
-              (id) {
-                setState(() {
-                  if (_selectedCategories.contains(id)) {
-                    _selectedCategories.remove(id);
-                  } else {
-                    _selectedCategories.add(id);
-                  }
-                });
-              },
-              isDark,
-            ),
+            _vOpt('Xem theo Ngày', 'day', Icons.calendar_today_rounded, ctx),
+            const Divider(),
+            _vOpt('Xem theo Tuần', 'week', Icons.calendar_view_week_rounded, ctx),
+            const Divider(),
+            _vOpt('Xem theo Tháng', 'month', Icons.calendar_month_rounded, ctx),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterSection(
-    String title,
-    List<Map<String, dynamic>> items,
-    List<String> selectedList,
-    Function(String) onToggle,
-    bool isDark,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: isDark ? ghDarkSubText : ghLightSubText,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                ),
+  Widget _vOpt(String l, String v, IconData i, BuildContext ctx) {
+    return ListTile(
+      leading:
+          Icon(i, color: _viewMode == v ? ghBlue : ghDarkSubText, size: 22),
+      title: Text(
+        l,
+        style: GoogleFonts.nunito(
+          fontWeight: _viewMode == v ? FontWeight.bold : FontWeight.normal,
+          fontSize: 15,
+        ),
+      ),
+      onTap: () {
+        setState(() {
+          _viewMode = v;
+          _calendarController.view = _getCalendarViewForMode(v);
+          _calendarController.displayDate = _selectedDay;
+        });
+        Navigator.pop(ctx);
+      },
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    );
+  }
+
+  CalendarView _getCalendarViewForMode(String mode) {
+    switch (mode) {
+      case 'day': return CalendarView.day;
+      case 'month': return CalendarView.month;
+      case 'week': default: return CalendarView.week;
+    }
+  }
+
+  Widget _buildLeftPanel(
+      bool isDark, Color borderColor, TaskProvider provider, bool isWeb) {
+    return Container(
+      width: isWeb ? 230 : double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? ghDarkCard : Colors.white,
+        border: Border(right: BorderSide(color: borderColor)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              DateFormat('MMMM yyyy').format(_selectedDay),
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                letterSpacing: 0.3,
               ),
-              if (title == "DỰ ÁN CỦA TÔI")
-                IconButton(
-                  icon: const Icon(Icons.add, size: 18),
-                  onPressed: () => showDialog(
-                    context: context,
-                    builder: (_) => const AddProjectScreen(),
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Divider(height: 1, color: borderColor),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              children: [
+                _sectionLabel("LỌC THEO DỰ ÁN"),
+                ...provider.projects.map(
+                  (p) => _filterTile(
+                      p.name, _selectedProjectIds.contains(p.project_id), (v) {
+                    setState(() {
+                      if (v!) {
+                        _selectedProjectIds.add(p.project_id);
+                      } else {
+                        _selectedProjectIds.remove(p.project_id);
+                      }
+                    });
+                  }, color: Color(p.colorValue)),
                 ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _sectionLabel("NHÓM CÁ NHÂN"),
+                    IconButton(
+                      icon: const Icon(Icons.add_box_outlined, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => _showAddCategoryDialog(isDark, provider),
+                    ),
+                  ],
+                ),
+                _filterTile("Chung (Mặc định)", _showUncategorized,
+                    (v) => setState(() => _showUncategorized = v!),
+                    color: ghBlue),
+                ...provider.categories.map(
+                  (c) => _filterTileWithActions(
+                    c.name,
+                    _selectedCategoryIds.contains(c.id),
+                    (v) {
+                      setState(() {
+                        if (v!) {
+                          _selectedCategoryIds.add(c.id);
+                        } else {
+                          _selectedCategoryIds.remove(c.id);
+                        }
+                      });
+                    },
+                    color: Color(c.colorValue),
+                    onLongPress: () =>
+                        _showCategoryOptions(isDark, provider, c),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Palette màu cho nhóm cá nhân (không có đỏ — dành cho dự án)
+  static const List<Color> _categoryPalette = [
+    Color(0xFF1E88E5), // Xanh dương
+    Color(0xFF43A047), // Xanh lá
+    Color(0xFFFB8C00), // Cam
+    Color(0xFF8E24AA), // Tím
+    Color(0xFF00ACC1), // Ngọc lam
+    Color(0xFFE91E63), // Hồng
+    Color(0xFF6D4C41), // Nâu
+    Color(0xFF00BCD4), // Cyan
+    Color(0xFFFFB300), // Vàng amber
+    Color(0xFF3949AB), // Chàm
+    Color(0xFF7CB342), // Lime
+    Color(0xFF6200EA), // Tím đậm
+    Color(0xFF0097A7), // Xanh biển đậm
+    Color(0xFFF4511E), // Cam đỏ (nhạt hơn đỏ)
+    Color(0xFF039BE5), // Xanh nhạt
+  ];
+
+  void _showAddCategoryDialog(bool isDark, TaskProvider provider,
+      {TaskCategory? editCategory}) {
+    final isEdit = editCategory != null;
+    final controller =
+        TextEditingController(text: isEdit ? editCategory.name : '');
+    Color selectedColor =
+        isEdit ? Color(editCategory.colorValue) : _categoryPalette[0];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? ghDarkCard : Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                    color: selectedColor, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                isEdit ? "Chỉnh sửa nhóm" : "Tạo nhóm mới",
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.bold, fontSize: 17),
+              ),
             ],
           ),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Tên nhóm",
+                    style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? ghDarkSubText : Colors.black54)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: "Nhập tên nhóm...",
+                    hintStyle: GoogleFonts.nunito(
+                        color: isDark ? ghDarkSubText : Colors.black38),
+                    filled: true,
+                    fillColor: isDark
+                        ? const Color(0xFF0D1117)
+                        : const Color(0xFFF6F8FA),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 11),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                            color: isDark ? ghDarkBorder : ghLightBorder)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                            color: isDark ? ghDarkBorder : ghLightBorder)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: ghBlue, width: 2)),
+                  ),
+                  style: GoogleFonts.nunito(
+                      color: isDark ? ghDarkText : Colors.black87),
+                ),
+                const SizedBox(height: 20),
+                Text("Màu sắc (đỏ dành riêng cho Dự án)",
+                    style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? ghDarkSubText : Colors.black54)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _categoryPalette
+                      .map((color) => GestureDetector(
+                            onTap: () =>
+                                setDialogState(() => selectedColor = color),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              width: selectedColor == color ? 36 : 30,
+                              height: selectedColor == color ? 36 : 30,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: selectedColor == color
+                                    ? Border.all(
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.black87,
+                                        width: 2.5)
+                                    : null,
+                                boxShadow: selectedColor == color
+                                    ? [
+                                        BoxShadow(
+                                            color: color.withValues(alpha: 0.5),
+                                            blurRadius: 8,
+                                            spreadRadius: 1)
+                                      ]
+                                    : null,
+                              ),
+                              child: selectedColor == color
+                                  ? const Icon(Icons.check,
+                                      color: Colors.white, size: 16)
+                                  : null,
+                            ),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
+                // Preview
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selectedColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: selectedColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                              color: selectedColor, shape: BoxShape.circle)),
+                      const SizedBox(width: 10),
+                      Text(
+                        controller.text.isEmpty
+                            ? "Tên nhóm của bạn"
+                            : controller.text,
+                        style: GoogleFonts.nunito(
+                            color: selectedColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text("Hủy",
+                    style: GoogleFonts.nunito(
+                        color: isDark ? ghDarkSubText : Colors.black54))),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isEmpty) return;
+                if (isEdit) {
+                  editCategory.name = controller.text.trim();
+                  editCategory.colorValue = selectedColor.toARGB32();
+                  provider.updateCategory(editCategory);
+                } else {
+                  provider.addCategory(TaskCategory(
+                    id: const Uuid().v4(),
+                    name: controller.text.trim(),
+                    colorValue: selectedColor.toARGB32(),
+                    userId:
+                        auth.FirebaseAuth.instance.currentUser?.uid ?? 'guest',
+                  ));
+                }
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: selectedColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8))),
+              child: Text(isEdit ? "Lưu" : "Tạo",
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+            )
+          ],
         ),
-        ...items.map((item) {
-          bool isSelected = selectedList.contains(item['id']);
-          return InkWell(
-            onTap: () => onToggle(item['id']),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      ),
+    );
+  }
+
+  void _showCategoryOptions(
+      bool isDark, TaskProvider provider, TaskCategory category) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? ghDarkCard : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                  color: isDark ? ghDarkBorder : ghLightBorder,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Row(
                 children: [
                   Container(
-                    width: 20,
-                    height: 20,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? item['color'] : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isSelected
-                            ? item['color']
-                            : (isDark ? ghDarkBorder : ghLightBorder),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: isSelected
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
-                  ),
-                  Expanded(
-                    child: Text(
-                      item['label'],
-                      style: TextStyle(
-                        color: isDark ? ghDarkText : ghLightText,
-                        fontSize: 14,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                          color: Color(category.colorValue),
+                          shape: BoxShape.circle)),
+                  const SizedBox(width: 10),
+                  Text(
+                    category.name,
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: isDark ? ghDarkText : Colors.black87),
                   ),
                 ],
               ),
             ),
-          );
-        }),
-        const SizedBox(height: 10),
-      ],
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, color: ghBlue),
+              title: Text("Chỉnh sửa nhóm",
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showAddCategoryDialog(isDark, provider,
+                    editCategory: category);
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: Text("Xóa nhóm",
+                  style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteCategory(isDark, provider, category);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildMiniCalendar(bool isDark) {
-    final first = DateTime(_miniMonth.year, _miniMonth.month, 1);
-    final offset = first.weekday - 1;
-    final days = DateUtils.getDaysInMonth(_miniMonth.year, _miniMonth.month);
-    final now = DateTime.now();
+  void _confirmDeleteCategory(
+      bool isDark, TaskProvider provider, TaskCategory category) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? ghDarkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Xóa nhóm?",
+            style:
+                GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 17)),
+        content: RichText(
+          text: TextSpan(
+            style: GoogleFonts.nunito(
+                color: isDark ? ghDarkText : Colors.black87, fontSize: 14),
+            children: [
+              const TextSpan(text: "Nhóm "),
+              TextSpan(
+                  text: '"${category.name}"',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              const TextSpan(
+                  text:
+                      " sẽ bị xóa. Các công việc trong nhóm này sẽ chuyển về nhóm chung."),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text("Hủy",
+                  style: GoogleFonts.nunito(
+                      color: isDark ? ghDarkSubText : Colors.black54))),
+          ElevatedButton(
+            onPressed: () {
+              setState(() =>
+                  _selectedCategoryIds.remove(category.id));
+              provider.deleteCategory(category.id);
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8))),
+            child:
+                Text("Xóa", style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Tháng ${_miniMonth.month}/${_miniMonth.year}",
-              style: TextStyle(
-                color: isDark ? ghDarkText : ghLightText,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-              ),
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 4),
+      child: Text(
+        text,
+        style: GoogleFonts.nunito(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: ghDarkSubText,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+
+  Widget _filterTile(String title, bool value, Function(bool?) onChanged,
+      {required Color color}) {
+    return CheckboxListTile(
+      title: Row(
+        children: [
+          Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
+          ),
+        ],
+      ),
+      value: value,
+      onChanged: onChanged,
+      controlAffinity: ListTileControlAffinity.leading,
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      activeColor: color,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _filterTileWithActions(
+    String title,
+    bool value,
+    Function(bool?) onChanged, {
+    required Color color,
+    VoidCallback? onLongPress,
+  }) {
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: CheckboxListTile(
+        title: Row(
+          children: [
+            Container(
+                width: 10,
+                height: 10,
+                decoration:
+                    BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(title,
+                  style: GoogleFonts.nunito(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Icon(Icons.more_horiz,
+                size: 16, color: ghDarkSubText.withValues(alpha: 0.6)),
           ],
         ),
-        const SizedBox(height: 20),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-          ),
-          itemCount: offset + days,
-          itemBuilder: (_, i) {
-            if (i < offset) return const SizedBox();
-            final day = DateTime(
-              _miniMonth.year,
-              _miniMonth.month,
-              i - offset + 1,
-            );
-            final isToday = _same(day, now);
-            final isSel = _same(day, _selectedDay);
-            return GestureDetector(
-              onTap: () => setState(() {
-                _selectedDay = day;
-                _viewMode = 'day';
-              }),
-              child: Center(
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: isToday
-                        ? ghGreen
-                        : (isSel
-                            ? ghBlue.withValues(alpha: 0.2)
-                            : Colors.transparent),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${day.day}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isToday
-                          ? Colors.white
-                          : (isSel
-                              ? ghBlue
-                              : (isDark ? ghDarkSubText : ghLightSubText)),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ],
+        value: value,
+        onChanged: onChanged,
+        controlAffinity: ListTileControlAffinity.leading,
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        activeColor: color,
+        contentPadding: EdgeInsets.zero,
+      ),
     );
+  }
+
+  List<Appointment> _buildAppointments(
+      List<Task> tasks, TaskProvider provider) {
+    return tasks.map((task) {
+      return Appointment(
+        startTime: task.due_day,
+        endTime: task.deadline,
+        subject: task.title,
+        color: provider.getTaskColor(task),
+        notes: task.task_id,
+      );
+    }).toList();
   }
 
   Widget _buildMainView(
@@ -918,731 +904,359 @@ class _CalendarScreenState extends State<CalendarScreen> {
     List<Task> tasks,
     Color borderColor,
     Color textColor,
+    TaskProvider provider,
   ) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.3, 0),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
+    return SfCalendar(
+      controller: _calendarController,
+      view: _getCalendarView(),
+      dataSource: TaskCalendarDataSource(_buildAppointments(tasks, provider)),
+      initialDisplayDate: _selectedDay,
+      todayHighlightColor: ghGreen,
+      backgroundColor: isDark ? ghDarkBg : ghLightBg,
+      cellBorderColor: borderColor.withValues(alpha: 0.15),
+      headerHeight: 0,
+      showNavigationArrow: false,
+      showDatePickerButton: false,
+      viewHeaderHeight: _viewMode == 'month' ? 36 : 56,
+      allowDragAndDrop: true,
+      allowAppointmentResize: true,
+      timeSlotViewSettings: const TimeSlotViewSettings(
+        timeIntervalHeight: 64,
+        timeFormat: 'HH:mm',
+        timeTextStyle: TextStyle(fontSize: 11),
+      ),
+      monthViewSettings: const MonthViewSettings(
+        appointmentDisplayMode: MonthAppointmentDisplayMode.appointment,
+        showAgenda: false,
+      ),
+      appointmentBuilder: (context, details) {
+        if (details.appointments.isEmpty) return const SizedBox();
+        final appointment = details.appointments.first as Appointment;
+        final taskId = appointment.notes;
+        final task = provider.tasks.firstWhere(
+          (t) => t.task_id == taskId,
+          orElse: () => tasks.first,
+        );
+
+        return TaskHoverCard(
+          task: task,
+          appointment: appointment,
+          provider: provider,
         );
       },
-      child: KeyedSubtree(
-        key: ValueKey(_viewMode),
-        child: switch (_viewMode) {
-          'day' => _buildDayTimeline(isDark, tasks, borderColor, textColor),
-          'month' => _buildMonthGrid(isDark, tasks, borderColor, textColor),
-          _ => _buildWeekTimeline(isDark, tasks, borderColor, textColor),
-        },
+      appointmentTextStyle: GoogleFonts.nunito(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
       ),
-    );
-  }
-
-  Widget _buildDayTimeline(
-    bool isDark,
-    List<Task> tasks,
-    Color borderColor,
-    Color textColor,
-  ) {
-    return Column(
-      children: [
-        _buildTimelineHeader([_selectedDay], isDark, textColor, borderColor),
-        Expanded(
-          child: SingleChildScrollView(
-            controller: _scroll,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: _hh * 24,
-              ),
-              child: SizedBox(
-                height: _hh * 24,
-                child: Row(
-                  children: [
-                    _buildTimeGutter(isDark),
-                    Expanded(
-                      child: _buildDayColumn(
-                        _selectedDay,
-                        tasks,
-                        isDark,
-                        borderColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildWeekTimeline(
-    bool isDark,
-    List<Task> tasks,
-    Color borderColor,
-    Color textColor,
-  ) {
-    final days = _weekOf(_selectedDay);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildTimelineHeader(days, isDark, textColor, borderColor),
-        Expanded(
-          child: SingleChildScrollView(
-            controller: _scroll,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: _hh * 24,
-              ),
-              child: SizedBox(
-                height: _hh * 24,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildTimeGutter(isDark),
-                    ...days.map(
-                      (d) => Expanded(
-                        child: _buildDayColumn(d, tasks, isDark, borderColor),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimelineHeader(
-    List<DateTime> days,
-    bool isDark,
-    Color textColor,
-    Color borderColor,
-  ) {
-    final now = DateTime.now();
-    final weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? ghDarkCard : ghLightCard,
-        border: Border(bottom: BorderSide(color: borderColor, width: 1.5)),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: [
-          const SizedBox(width: 70),
-          ...days.map((d) {
-            final isToday = _same(d, now);
-            return Expanded(
-              child: Column(
-                children: [
-                  Text(
-                    weekdays[d.weekday - 1],
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isToday
-                          ? ghGreen
-                          : (isDark ? ghDarkSubText : ghLightSubText),
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: isToday
-                          ? LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [ghGreen, ghGreen.withValues(alpha: 0.8)],
-                            )
-                          : null,
-                      color:
-                          isToday ? null : (isDark ? ghDarkCard : ghLightCard),
-                      shape: BoxShape.circle,
-                      border: isToday
-                          ? null
-                          : Border.all(color: borderColor, width: 1),
-                      boxShadow: isToday
-                          ? [
-                              BoxShadow(
-                                color: ghGreen.withValues(alpha: 0.4),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${d.day}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: isToday ? Colors.white : textColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimeGutter(bool isDark) {
-    return Container(
-      width: 70,
-      padding: const EdgeInsets.only(right: 12),
-      child: Stack(
-        children: List.generate(
-          48, // 24 hours * 2 (30-minute intervals)
-          (i) => Positioned(
-            top: i * (_hh / 2) - 8,
-            left: 0,
-            right: 0,
-            child: Text(
-              '${(i ~/ 2).toString().padLeft(2, '0')}:${(i % 2 == 0 ? '00' : '30')}',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? ghDarkSubText : ghLightSubText,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  final Map<DateTime, GlobalKey> _columnKeys = {};
-
-  Widget _buildDayColumn(
-    DateTime day,
-    List<Task> tasks,
-    bool isDark,
-    Color borderColor,
-  ) {
-    _columnKeys[day] ??= GlobalKey();
-
-    return DragTarget<Task>(
-      onWillAcceptWithDetails: (details) => true,
-      onAcceptWithDetails: (details) async {
-        final context = _columnKeys[day]?.currentContext;
-        if (context == null) return;
-
-        final renderBox = context.findRenderObject() as RenderBox?;
-        if (renderBox == null || !renderBox.hasSize) return;
-
-        final localOffset = renderBox.globalToLocal(details.offset);
-
-        // Calculate new hour and minute
-        double rawHour = localOffset.dy / _hh;
-        int hour = rawHour.floor().clamp(0, 23);
-        int minute = (((localOffset.dy % _hh) / _hh * 60) / 15).round() * 15;
-        if (minute == 60) {
-          hour++;
-          minute = 0;
+      onViewChanged: (details) {
+        if (details.visibleDates.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _selectedDay = details.visibleDates[
+                  details.visibleDates.length ~/ 2
+                ];
+              });
+            }
+          });
         }
-        if (hour > 23) {
-          hour = 23;
-          minute = 45;
+      },
+      onTap: (details) {
+        if (details.appointments != null && details.appointments!.isNotEmpty) {
+          final appointment = details.appointments!.first as Appointment;
+          final taskId = appointment.notes;
+          final task = provider.tasks.firstWhere(
+            (t) => t.task_id == taskId,
+            orElse: () => tasks.first,
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => TaskDetailScreen(task: task)),
+          );
+          return;
         }
-
-        final newTaskTime = DateTime(
-          day.year,
-          day.month,
-          day.day,
-          hour,
-          minute,
+        if (details.date != null) {
+          showDialog(
+            context: context,
+            builder: (_) => QuickAddTaskDialog(initialDate: details.date!),
+          );
+        }
+      },
+      onDragEnd: (details) async {
+        if (details.appointment == null || details.droppingTime == null) return;
+        final appointment = details.appointment as Appointment;
+        final taskId = appointment.notes;
+        final task = provider.tasks.firstWhere(
+          (t) => t.task_id == taskId,
+          orElse: () => tasks.first,
         );
-        final task = details.data;
+        
+        if (task.project_id != null) {
+          final project = provider.projects.where((p) => p.project_id == task.project_id).firstOrNull;
+          if (project != null && project.startDate != null && details.droppingTime!.isBefore(project.startDate!)) {
+            if (mounted) {
+              AppPopup.show(context,
+                  title: "Lỗi thời gian",
+                  message: "Không thể di chuyển trước ngày bắt đầu dự án (${DateFormat('dd/MM/yyyy HH:mm').format(project.startDate!)})",
+                  color: Colors.redAccent);
+            }
+            setState(() {});
+            return;
+          }
+        }
 
-        // Update task time
-        task.due_day = newTaskTime;
-        task.deadline = newTaskTime.add(Duration(minutes: task.duration));
+        final duration = task.duration;
+        task.due_day = details.droppingTime!;
+        task.deadline = details.droppingTime!.add(Duration(minutes: duration));
         task.updatedAt = DateTime.now();
         task.isSynced = false;
-
-        if (!mounted) return;
-        await Provider.of<TaskProvider>(
-          context,
-          listen: false,
-        ).updateTask(task);
-        if (!mounted) return;
-        AppPopup.show(
-          context,
-          title: 'Đã cập nhật',
-          message:
-              "Đã chuyển '${task.title}' sang ${_fmtHM(newTaskTime)} ngày ${day.day}/${day.month}",
-          color: ghBlue,
-          icon: Icons.event_available,
-        );
+        await provider.updateTask(task);
+        if (mounted) {
+          AppPopup.show(context,
+              title: "Đã cập nhật",
+              message: "Đã di chuyển '${task.title}'",
+              color: ghBlue);
+        }
       },
-      builder: (context, candidateData, rejectedData) {
-        return Container(
-          key: _columnKeys[day],
-          height: _hh * 24,
-          decoration: BoxDecoration(
-            border: Border(right: BorderSide(color: borderColor, width: 1)),
-          ),
-          child: Stack(
-            children: [
-              ...List.generate(
-                48, // 24 hours * 2 (30-minute intervals)
-                (i) => Positioned(
-                  top: i * (_hh / 2),
-                  left: 0,
-                  right: 0,
-                  height: _hh / 2,
-                  child: GestureDetector(
-                    onTap: () => _showQuickAddTask(day, i ~/ 2, (i % 2) * 30),
-                    child: Container(
-                      color: Colors.transparent,
-                      child: Divider(
-                        height: 1,
-                        color: borderColor,
-                        thickness: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (_same(day, DateTime.now()))
-                Positioned(
-                  top: _nowY(),
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: ghBlue,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Expanded(
-                        child: Container(
-                          height: 2,
-                          color: ghBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ..._forDay(
-                day,
-                tasks,
-              ).map((task) => _buildTaskBlock(task, isDark)),
-              if (candidateData.isNotEmpty)
-                Positioned.fill(
-                  child: Container(color: ghBlue.withValues(alpha: 0.05)),
-                ),
-            ],
-          ),
+      onAppointmentResizeEnd: (details) async {
+        if (details.appointment == null ||
+            details.startTime == null ||
+            details.endTime == null) {
+          return;
+        }
+        final appointment = details.appointment as Appointment;
+        final taskId = appointment.notes;
+        final task = provider.tasks.firstWhere(
+          (t) => t.task_id == taskId,
+          orElse: () => tasks.first,
         );
+        
+        if (task.project_id != null) {
+          final project = provider.projects.where((p) => p.project_id == task.project_id).firstOrNull;
+          if (project != null && project.startDate != null && details.startTime!.isBefore(project.startDate!)) {
+            if (mounted) {
+              AppPopup.show(context,
+                  title: "Lỗi thời gian",
+                  message: "Thời gian bắt đầu không được trước ngày bắt đầu dự án (${DateFormat('dd/MM/yyyy HH:mm').format(project.startDate!)})",
+                  color: Colors.redAccent);
+            }
+            setState(() {});
+            return;
+          }
+        }
+
+        task.due_day = details.startTime!;
+        task.deadline = details.endTime!;
+        task.duration =
+            details.endTime!.difference(details.startTime!).inMinutes;
+        task.updatedAt = DateTime.now();
+        task.isSynced = false;
+        await provider.updateTask(task);
+        if (mounted) {
+          AppPopup.show(context,
+              title: "Đã cập nhật",
+              message: "Đã thay đổi thời lượng",
+              color: ghGreen);
+        }
       },
     );
   }
+}
 
-  Widget _buildTaskBlock(Task task, bool isDark) {
-    final color = _taskColor(task.priority);
-    final top = _taskY(task);
-    final currentDuration =
-        _resizingTask == task ? _tempDuration ?? task.duration : task.duration;
-    final currentH = currentDuration / 60 * _hh;
-
-    final content = Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withValues(alpha: isDark ? 0.25 : 0.15),
-            color.withValues(alpha: isDark ? 0.1 : 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border(left: BorderSide(color: color, width: 3)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.2),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            task.title,
-            style: TextStyle(
-              color: isDark ? ghDarkText : ghLightText,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _fmtDHM(task.due_day),
-            style: TextStyle(
-              color: isDark ? ghDarkSubText : ghLightSubText,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-      top: top,
-      left: 2,
-      right: 2,
-      height: currentH,
-      child: Stack(
-        children: [
-          Draggable<Task>(
-            data: task,
-            feedback: Material(
-              elevation: 12,
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: isDark ? 0.5 : 0.4),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border(left: BorderSide(color: color, width: 5)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(10),
-                child: SizedBox(
-                  width: (() {
-                    final context = _columnKeys[task.due_day]?.currentContext;
-                    if (context == null) return 150.0;
-                    final renderBox = context.findRenderObject() as RenderBox?;
-                    if (renderBox == null || !renderBox.hasSize) return 150.0;
-                    return renderBox.size.width;
-                  })(),
-                  height: currentH,
-                  child: content,
-                ),
-              ),
-            ),
-            childWhenDragging: Opacity(
-              opacity: 0.3,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: isDark ? 0.1 : 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border(left: BorderSide(color: color, width: 5)),
-                ),
-                child: content,
-              ),
-            ),
-            onDragStarted: () {
-              try {
-                Feedback.forLongPress(context);
-              } catch (_) {}
-            },
-            child: AnimatedScale(
-              scale: _resizingTask == task ? 1.02 : 1.0,
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOut,
-              child: InkWell(
-                onTap: () => _openTask(task),
-                borderRadius: BorderRadius.circular(8),
-                child: content,
-              ),
-            ),
-          ),
-          // Resize handle ở cạnh dưới
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 12,
-            child: GestureDetector(
-              onVerticalDragStart: (details) {
-                setState(() {
-                  _resizingTask = task;
-                  _resizeStartY = details.globalPosition.dy;
-                  _resizeStartDuration = task.duration;
-                });
-                try {
-                  Feedback.forLongPress(context);
-                } catch (_) {}
-              },
-              onVerticalDragUpdate: (details) {
-                if (_resizingTask == task) {
-                  final deltaY = details.globalPosition.dy - _resizeStartY;
-                  final deltaMinutes = (deltaY / _hh * 60).round();
-                  final newDuration =
-                      (_resizeStartDuration + deltaMinutes).clamp(15, 480);
-
-                  setState(() {
-                    _tempDuration = newDuration;
-                  });
-                }
-              },
-              onVerticalDragEnd: (details) async {
-                if (_resizingTask == task && _tempDuration != null) {
-                  final newDuration = _tempDuration!;
-
-                  setState(() {
-                    _resizingTask = null;
-                    _tempDuration = null;
-                  });
-
-                  // Cập nhật task
-                  task.duration = newDuration;
-                  task.deadline = task.due_day.add(
-                    Duration(minutes: newDuration),
-                  );
-                  task.updatedAt = DateTime.now();
-                  task.isSynced = false;
-
-                  await Provider.of<TaskProvider>(
-                    context,
-                    listen: false,
-                  ).updateTask(task);
-
-                  if (mounted) {
-                    AppPopup.show(
-                      context,
-                      title: 'Đã cập nhật',
-                      message:
-                          "Đã thay đổi thời lượng '${task.title}' thành $newDuration phút",
-                      color: ghGreen,
-                      icon: Icons.access_time,
-                    );
-                  }
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                curve: Curves.easeOut,
-                decoration: BoxDecoration(
-                  color: _resizingTask == task
-                      ? color.withValues(alpha: 0.7)
-                      : color.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: const Radius.circular(8),
-                    bottomRight: const Radius.circular(8),
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.drag_handle,
-                    color: Colors.white,
-                    size: _resizingTask == task ? 18 : 16,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+class TaskCalendarDataSource extends CalendarDataSource {
+  TaskCalendarDataSource(List<Appointment> source) {
+    appointments = source;
   }
+}
 
-  Task? _resizingTask;
-  double _resizeStartY = 0;
-  int _resizeStartDuration = 0;
-  int? _tempDuration;
+class TaskHoverCard extends StatefulWidget {
+  final Task task;
+  final Appointment appointment;
+  final TaskProvider provider;
 
-  void _showQuickAddTask(DateTime day, int hour, int minute) {
-    final selectedTime = DateTime(day.year, day.month, day.day, hour, minute);
-    showDialog(
-      context: context,
-      builder: (context) => QuickAddTaskDialog(initialDate: selectedTime),
-    );
-  }
+  const TaskHoverCard({
+    super.key,
+    required this.task,
+    required this.appointment,
+    required this.provider,
+  });
 
-  void _openTask(Task task) {
-    if (task.project_id != null && task.project_id!.isNotEmpty) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => TaskDetailScreen(task: task)),
-      );
-      return;
-    }
+  @override
+  State<TaskHoverCard> createState() => _TaskHoverCardState();
+}
 
-    showDialog(
-      context: context,
-      builder: (_) => QuickEditTaskDialog(task: task),
-    );
-  }
+class _TaskHoverCardState extends State<TaskHoverCard> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+  bool _isHovered = false;
 
-  Widget _buildMonthGrid(
-    bool isDark,
-    List<Task> tasks,
-    Color borderColor,
-    Color textColor,
-  ) {
-    final first = DateTime(_miniMonth.year, _miniMonth.month, 1);
-    final offset = first.weekday - 1;
-    final daysCount = DateUtils.getDaysInMonth(
-      _miniMonth.year,
-      _miniMonth.month,
-    );
-    final rows = ((offset + daysCount) / 7).ceil();
-    final now = DateTime.now();
-    final weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  void _showOverlay(BuildContext context) {
+    if (_overlayEntry != null) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            children: weekdays
-                .map(
-                  (d) => Expanded(
-                    child: Text(
-                      d,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isDark ? ghDarkSubText : ghLightSubText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-        Expanded(
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: rows * 7,
-            itemBuilder: (_, i) {
-              final dayNum = i - offset + 1;
-              if (dayNum < 1 || dayNum > daysCount) {
-                return Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: borderColor, width: 0.2),
-                  ),
-                );
-              }
-              final day = DateTime(_miniMonth.year, _miniMonth.month, dayNum);
-              final dayTasks = _forDay(day, tasks);
-              final isToday = _same(day, now);
-              return InkWell(
-                onTap: () => setState(() {
-                  _selectedDay = day;
-                  _viewMode = 'day';
-                }),
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          width: 340,
+          child: CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.topRight,
+            followerAnchor: Alignment.topLeft,
+            offset: const Offset(8, 0),
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              color: isDark ? const Color(0xFF161B22) : Colors.white,
+              child: MouseRegion(
+                onEnter: (_) {
+                  _isHovered = true;
+                },
+                onExit: (_) {
+                  _isHovered = false;
+                  _hideOverlay();
+                },
                 child: Container(
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    border: Border.all(color: borderColor, width: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE)),
                   ),
-                  padding: const EdgeInsets.all(6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Center(
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: isToday ? ghGreen : Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '$dayNum',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: isToday ? Colors.white : textColor,
+                      Row(
+                        children: [
+                          Container(width: 12, height: 12, decoration: BoxDecoration(color: widget.appointment.color, shape: BoxShape.circle)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.task.title,
+                              style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? const Color(0xFFC9D1D9) : const Color(0xFF24292F)),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      ...dayTasks.take(3).map(
-                            (t) => Container(
-                              margin: const EdgeInsets.only(top: 4),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _taskColor(t.priority)
-                                    .withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                t.title,
-                                style: TextStyle(
-                                  color: isDark ? ghDarkText : ghLightText,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "${DateFormat('HH:mm').format(widget.task.due_day)} - ${DateFormat('HH:mm').format(widget.task.deadline)}",
+                        style: GoogleFonts.nunito(fontSize: 13, color: isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A)),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            icon: const Icon(Icons.copy, size: 16, color: Color(0xFF58A6FF)),
+                            label: Text("Nhân bản", style: GoogleFonts.nunito(color: const Color(0xFF58A6FF), fontSize: 13)),
+                            onPressed: () {
+                              _hideOverlay();
+                              final newTask = Task(
+                                task_id: const Uuid().v4(),
+                                user_id: widget.task.user_id,
+                                title: "${widget.task.title} (Bản sao)",
+                                description: widget.task.description,
+                                due_day: widget.task.due_day,
+                                priority: widget.task.priority,
+                                progress: widget.task.progress,
+                                duration: widget.task.duration,
+                                deadline: widget.task.deadline,
+                                status: widget.task.status,
+                                createdAt: DateTime.now(),
+                                updatedAt: DateTime.now(),
+                                isSynced: false,
+                                isDeleted: false,
+                                category: widget.task.category,
+                                orderIndex: widget.task.orderIndex,
+                                project_id: widget.task.project_id,
+                                assigneeId: widget.task.assigneeId,
+                                attachments: List.from(widget.task.attachments),
+                                reminder: widget.task.reminder,
+                                categoryId: widget.task.categoryId,
+                              );
+                              widget.provider.addTask(newTask);
+                              AppPopup.success(context, "Đã nhân bản công việc!");
+                            },
                           ),
-                      if (dayTasks.length > 3)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            '+${dayTasks.length - 3} nữa',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: ghBlue,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.edit, size: 16, color: Color(0xFF3FB950)),
+                            label: Text("Sửa", style: GoogleFonts.nunito(color: const Color(0xFF3FB950), fontSize: 13)),
+                            onPressed: () {
+                              _hideOverlay();
+                              showDialog(
+                                context: context,
+                                builder: (_) => QuickEditTaskDialog(task: widget.task),
+                              );
+                            },
                           ),
-                        ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                            label: Text("Xóa", style: GoogleFonts.nunito(color: Colors.redAccent, fontSize: 13)),
+                            onPressed: () {
+                              _hideOverlay();
+                              widget.provider.deleteTask(widget.task.task_id);
+                              AppPopup.show(context, title: "Đã xóa", message: "Công việc đã được chuyển vào thùng rác", color: Colors.redAccent);
+                            },
+                          ),
+                        ],
+                      )
                     ],
                   ),
                 ),
-              );
-            },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _hideOverlay() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!_isHovered && mounted) {
+        _overlayEntry?.remove();
+        _overlayEntry = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: MouseRegion(
+        onEnter: (_) {
+          _isHovered = true;
+          _showOverlay(context);
+        },
+        onExit: (_) {
+          _isHovered = false;
+          _hideOverlay();
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: widget.appointment.color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Text(
+            widget.appointment.subject,
+            style: GoogleFonts.nunito(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-      ],
+      ),
     );
   }
 }

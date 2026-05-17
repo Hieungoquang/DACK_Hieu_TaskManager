@@ -45,6 +45,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void register() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final email = emailController.text.trim();
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      AppPopup.error(context, "Email không hợp lệ, không được sử dụng!");
+      return;
+    }
+
     setState(() => isLoading = true);
     HapticFeedback.mediumImpact();
 
@@ -153,9 +160,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isDark: isDark,
                       textColor: textColor,
                       labelColor: labelColor,
-                      validator: (v) => (v == null || !v.contains("@"))
-                          ? "Email không hợp lệ"
-                          : null,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return "Vui lòng nhập email";
+                        }
+                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                        if (!emailRegex.hasMatch(v.trim())) {
+                          return "Email không hợp lệ, không được sử dụng!";
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 15),
                     _buildDuoTextField(
@@ -165,6 +179,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       textColor: textColor,
                       labelColor: labelColor,
                       keyboardType: TextInputType.phone,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return "Vui lòng nhập số điện thoại";
+                        }
+                        final cleanPhone = v.replaceAll(RegExp(r'\s+'), '');
+                        final phoneRegex = RegExp(r'^(0|\+84)(3|5|7|8|9)[0-9]{8}$');
+                        if (!phoneRegex.hasMatch(cleanPhone)) {
+                          return "Số điện thoại không hợp lệ (ví dụ: 0912345678)";
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 15),
                     _buildDuoTextField(

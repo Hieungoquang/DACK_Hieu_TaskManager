@@ -112,9 +112,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       textColor: textColor,
                       labelColor: labelColor,
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return "Vui lòng nhập email";
-                        if (!v.contains('@')) return "Email không hợp lệ";
+                        }
+                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                        if (!emailRegex.hasMatch(v.trim())) {
+                          return "Email không hợp lệ (ví dụ: name@example.com)";
+                        }
                         return null;
                       },
                     ),

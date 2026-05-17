@@ -20,6 +20,7 @@ import 'models/task_schedule_model.dart';
 import 'models/notification_model.dart' as model;
 import 'models/user_availability_model.dart';
 import 'models/project_model.dart';
+import 'models/task_category_model.dart';
 
 import 'provider/task_provider.dart';
 import 'provider/app_provider.dart';
@@ -32,15 +33,6 @@ void main() async {
         options: DefaultFirebaseOptions.currentPlatform);
   } catch (e) {
     debugPrint("Firebase init error: $e");
-  }
-
-  Future<void> testFirebase() async {
-    await FirebaseFirestore.instance.collection('test').add({
-      'message': 'Hello Firebase',
-      'time': DateTime.now().toString(),
-    });
-
-    print("UPLOAD SUCCESS");
   }
 
   // Khởi tạo Thông báo (Chỉ chạy trên Mobile)
@@ -58,16 +50,16 @@ void main() async {
   if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(ProjectAdapter());
   if (!Hive.isAdapterRegistered(4)) Hive.registerAdapter(TimelogsAdapter());
   if (!Hive.isAdapterRegistered(5)) Hive.registerAdapter(TaskScheduleAdapter());
-  if (!Hive.isAdapterRegistered(6))
-    Hive.registerAdapter(model.NotificationAdapter());
-  if (!Hive.isAdapterRegistered(7))
-    Hive.registerAdapter(UserAvailabilityAdapter());
+  if (!Hive.isAdapterRegistered(6)) Hive.registerAdapter(model.NotificationAdapter());
+  if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(UserAvailabilityAdapter());
+  if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(TaskCategoryAdapter());
 
   await Hive.openBox<Task>('tasksBox');
   await Hive.openBox<Time_logs>('timeLogsBox');
   await Hive.openBox<Subtask>('subtasksBox');
   await Hive.openBox<model.Notification>('notificationsBox');
   await Hive.openBox<Project>('projectsBox');
+  await Hive.openBox<TaskCategory>('categoriesBox');
 
   runApp(const MyApp());
 }

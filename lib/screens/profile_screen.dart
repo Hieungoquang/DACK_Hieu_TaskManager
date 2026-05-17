@@ -131,11 +131,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isNotEmpty) {
+      final cleanPhone = phone.replaceAll(RegExp(r'\s+'), '');
+      final phoneRegex = RegExp(r'^(0|\+84)(3|5|7|8|9)[0-9]{8}$');
+      if (!phoneRegex.hasMatch(cleanPhone)) {
+        AppPopup.error(context, "Số điện thoại không hợp lệ (ví dụ: 0912345678)");
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     final result = await _auth.updateProfile(
       fullName: _nameController.text.trim(),
       username: _usernameController.text.trim(),
-      phoneNumber: _phoneController.text.trim(),
+      phoneNumber: phone,
       email: _emailController.text.trim(),
     );
     setState(() => _isLoading = false);

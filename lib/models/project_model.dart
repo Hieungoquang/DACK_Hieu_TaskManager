@@ -34,16 +34,24 @@ class Project extends HiveObject {
   @HiveField(9)
   bool isDeleted;
 
+  @HiveField(10)
+  DateTime? startDate;
+
+  @HiveField(11)
+  DateTime? endDate;
+
   Project({
     required this.project_id,
     required this.user_id,
     required this.name,
     this.description = "",
-    this.colorValue = 0xFF1CB0F6,
+    this.colorValue = 0xFFFF0000,
     required this.createdAt,
     required this.updatedAt,
     this.memberIds = const [],
     this.memberStatuses = const {},
     this.isDeleted = false,
+    this.startDate,
+    this.endDate,
   });
 }

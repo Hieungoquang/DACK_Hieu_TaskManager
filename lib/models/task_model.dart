@@ -43,6 +43,10 @@ class Task extends HiveObject {
   List<String> attachments; // Danh sách tệp đính kèm
   @HiveField(19)
   int reminder; // Thời gian thông báo trước (phút), 0 = không thông báo
+  @HiveField(20)
+  String? categoryId; // ID của nhóm công việc cá nhân
+  @HiveField(21)
+  String? dependencyTaskId; // ID của công việc tiên quyết
 
   Task({
     required this.task_id,
@@ -65,5 +69,7 @@ class Task extends HiveObject {
     this.assigneeId,
     this.attachments = const [],
     this.reminder = 0,
+    this.categoryId,
+    this.dependencyTaskId,
   });
 }
