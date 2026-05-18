@@ -2,13 +2,18 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter/foundation.dart';
+import 'web_notification_stub.dart'
+    if (dart.library.html) 'web_notification_html.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   static Future<void> init() async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      await WebNotification.requestPermission();
+      return;
+    }
 
     tz.initializeTimeZones();
 
@@ -42,7 +47,10 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      WebNotification.show(title, body);
+      return;
+    }
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -70,9 +78,15 @@ class NotificationService {
     required DateTime scheduledDate,
     bool repeatDaily = false,
   }) async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      // Web không hỗ trợ scheduled notification — fallback dùng Timer.
+      if (!repeatDaily && scheduledDate.isBefore(DateTime.now())) return;
+      final delay = scheduledDate.difference(DateTime.now());
+      if (delay.isNegative) return;
+      Future.delayed(delay, () => WebNotification.show(title, body));
+      return;
+    }
 
-    // Nếu không lặp lại và thời gian đã qua thì bỏ qua
     if (!repeatDaily && scheduledDate.isBefore(DateTime.now())) return;
 
     final androidDetails = AndroidNotificationDetails(

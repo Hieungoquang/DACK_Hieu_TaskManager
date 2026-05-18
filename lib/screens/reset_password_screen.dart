@@ -2,20 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../widgets/app_popup.dart';
-import 'reset_password_screen.dart';
+import 'login_screen.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  final String? oobCode;
+
+  const ResetPasswordScreen({super.key, this.oobCode});
 
   @override
-  _ForgotPasswordScreenState createState() => _ForgotPasswordScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _auth = AuthService();
-  final emailController = TextEditingController();
+  final _auth = AuthService();
+
+  final _codeController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   final Color duoGreen = const Color(0xFF58CC02);
   final Color duoGreenDark = const Color(0xFF46A302);
@@ -24,13 +32,50 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final Color duoText = const Color(0xFF1F1F1F);
   final Color duoSecondaryText = const Color(0xFF4B4B4B);
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.oobCode != null) {
+      _codeController.text = widget.oobCode!;
+    }
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
   Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
+
+    String rawInput = _codeController.text.trim();
+    String finalCode = rawInput;
+
+    // Tự động phân tích và trích xuất oobCode nếu người dùng dán toàn bộ đường link khôi phục
+    if (rawInput.contains('oobCode=')) {
+      try {
+        final uri = Uri.parse(rawInput);
+        finalCode = uri.queryParameters['oobCode'] ?? rawInput;
+      } catch (_) {
+        // Fallback to original text if URI parsing fails
+      }
+    }
+
+    if (finalCode.isEmpty) {
+      AppPopup.error(context, "Mã xác thực không hợp lệ. Vui lòng kiểm tra lại email.");
+      return;
+    }
 
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
-    String? error = await _auth.forgotPassword(emailController.text.trim());
+    String? error = await _auth.confirmPasswordReset(
+      code: finalCode,
+      newPassword: _passwordController.text.trim(),
+    );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -38,14 +83,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (error == null) {
       await AppPopup.success(
         context,
-        "Email khôi phục mật khẩu đã được gửi! Vui lòng sao chép mã xác nhận hoặc toàn bộ đường link khôi phục trong email để tiến hành đặt mật khẩu mới.",
+        "Mật khẩu của bạn đã được đặt lại thành công. Vui lòng đăng nhập lại!",
       );
       if (mounted) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(
-            builder: (_) => const ResetPasswordScreen(oobCode: null),
-          ),
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
         );
       }
     } else {
@@ -62,15 +106,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         isDark ? Colors.white.withValues(alpha: 0.7) : duoSecondaryText;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_rounded, color: duoBlue),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
+          },
         ),
       ),
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -80,10 +130,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Form(
                 key: _formKey,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    // Bouncing Entrance Key Animation
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
-                      duration: const Duration(milliseconds: 800),
+                      duration: const Duration(milliseconds: 1000),
                       curve: Curves.elasticOut,
                       builder: (context, double value, child) {
                         return Transform.scale(
@@ -95,7 +147,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      "QUÊN MẬT KHẨU",
+                      "MẬT KHẨU MỚI",
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
@@ -105,7 +157,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      "Nhập email của bạn để nhận liên kết khôi phục mật khẩu.",
+                      "Thiết lập mật khẩu mới cho tài khoản của bạn.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 15,
@@ -114,33 +166,84 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                     ),
                     const SizedBox(height: 40),
+
+                    // Verification Code / Link Input Field
                     _buildDuoTextField(
-                      controller: emailController,
-                      hint: "EMAIL CỦA BẠN",
-                      icon: Icons.email_rounded,
+                      controller: _codeController,
+                      hint: "MÃ MẬT KHẨU HOẶC DÁN ĐƯỜNG LINK EMAIL",
+                      icon: Icons.vpn_key_rounded,
                       isDark: isDark,
                       textColor: textColor,
                       labelColor: labelColor,
                       validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return "Vui lòng nhập email";
-                        }
-                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                        if (!emailRegex.hasMatch(v.trim())) {
-                          return "Email không hợp lệ (ví dụ: name@example.com)";
+                        if (v == null || v.trim().isEmpty) {
+                          return "Vui lòng dán liên kết hoặc nhập mã từ email";
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 15),
+
+                    // Password Field
+                    _buildDuoTextField(
+                      controller: _passwordController,
+                      hint: "MẬT KHẨU MỚI",
+                      icon: Icons.lock_rounded,
+                      isDark: isDark,
+                      textColor: textColor,
+                      labelColor: labelColor,
+                      isPassword: true,
+                      obscureText: _obscurePassword,
+                      onTogglePassword: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return "Vui lòng nhập mật khẩu mới";
+                        }
+                        if (v.length < 8) {
+                          return "Mật khẩu phải dài tối thiểu 8 ký tự";
+                        }
+                        if (!RegExp(r'^(?=.*[A-Z])(?=.*[0-9])').hasMatch(v)) {
+                          return "Mật khẩu cần ít nhất 1 chữ hoa và 1 chữ số";
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Confirm Password Field
+                    _buildDuoTextField(
+                      controller: _confirmController,
+                      hint: "XÁC NHẬN MẬT KHẨU MỚI",
+                      icon: Icons.lock_outline_rounded,
+                      isDark: isDark,
+                      textColor: textColor,
+                      labelColor: labelColor,
+                      isPassword: true,
+                      obscureText: _obscureConfirm,
+                      onTogglePassword: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return "Vui lòng xác nhận mật khẩu mới";
+                        }
+                        if (v != _passwordController.text) {
+                          return "Mật khẩu xác nhận không khớp";
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 35),
+
+                    // Submit Button
                     _isLoading
-                        ? CircularProgressIndicator(color: duoBlue)
-                        : _Duo3DButton(
-                            text: "GỬI YÊU CẦU",
-                            color: duoBlue,
-                            shadowColor: const Color(0xFF1899D6),
-                            onPressed: _handleResetPassword,
-                          ),
+                      ? CircularProgressIndicator(color: duoBlue)
+                      : _Duo3DButton(
+                          text: "ĐỔI MẬT KHẨU",
+                          color: duoBlue,
+                          shadowColor: const Color(0xFF1899D6),
+                          onPressed: _handleResetPassword,
+                        ),
                   ],
                 ),
               ),
@@ -158,10 +261,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     required bool isDark,
     required Color textColor,
     required Color labelColor,
+    bool isPassword = false,
+    bool? obscureText,
+    VoidCallback? onTogglePassword,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
+      obscureText: isPassword ? (obscureText ?? true) : false,
       validator: validator,
       style: TextStyle(
         fontWeight: FontWeight.w900,
@@ -176,6 +283,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           fontSize: 13,
         ),
         prefixIcon: Icon(icon, color: duoBlue, size: 20),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscureText! ? Icons.visibility_off : Icons.visibility,
+                  color: labelColor,
+                ),
+                onPressed: onTogglePassword,
+              )
+            : null,
         filled: true,
         fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF7F7F7),
         contentPadding: const EdgeInsets.symmetric(

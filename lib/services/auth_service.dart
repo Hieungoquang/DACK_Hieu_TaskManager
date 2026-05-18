@@ -25,14 +25,70 @@ class AuthService {
 
   Future<String?> forgotPassword(String email) async {
     try {
+      // 1. Kiểm tra xem email có tồn tại trong Firestore không
+      final userQuery = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get()
+          .timeout(const Duration(seconds: 10));
+
+      if (userQuery.docs.isEmpty) {
+        return "Email không tồn tại trong hệ thống";
+      }
+
+      // 2. Tạo cấu hình ActionCodeSettings để liên kết mở app hoặc web tùy chỉnh
+      final actionCodeSettings = ActionCodeSettings(
+        url: 'https://da-task-dbe5b.web.app/reset-password?email=$email',
+        handleCodeInApp: true,
+        androidPackageName: 'com.example.task_manager',
+        androidInstallApp: true,
+        androidMinimumVersion: '12',
+      );
+
+      // 3. Gửi email khôi phục mật khẩu với ActionCodeSettings
       await _auth
-          .sendPasswordResetEmail(email: email)
+          .sendPasswordResetEmail(
+            email: email,
+            actionCodeSettings: actionCodeSettings,
+          )
           .timeout(const Duration(seconds: 15));
       return null;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found')
+      if (e.code == 'user-not-found') {
         return "Email không tồn tại trong hệ thống";
+      }
       return e.message;
+    } on TimeoutException {
+      return "Yêu cầu quá hạn. Vui lòng kiểm tra kết nối mạng.";
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth
+          .confirmPasswordReset(code: code, newPassword: newPassword)
+          .timeout(const Duration(seconds: 15));
+      return null;
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'expired-action-code':
+          return "Mã xác thực đã hết hạn. Vui lòng yêu cầu lại.";
+        case 'invalid-action-code':
+          return "Mã xác thực không hợp lệ. Vui lòng kiểm tra lại.";
+        case 'weak-password':
+          return "Mật khẩu quá yếu (tối thiểu 6 ký tự).";
+        case 'user-disabled':
+          return "Tài khoản của bạn đã bị vô hiệu hóa.";
+        case 'user-not-found':
+          return "Không tìm thấy người dùng tương ứng.";
+        default:
+          return e.message ?? "Lỗi xác thực không xác định.";
+      }
     } on TimeoutException {
       return "Yêu cầu quá hạn. Vui lòng kiểm tra kết nối mạng.";
     } catch (e) {

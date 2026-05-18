@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/task_model.dart';
 import '../provider/task_provider.dart';
 import '../provider/app_provider.dart';
+import '../widgets/app_popup.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final String? projectId;
@@ -26,7 +27,7 @@ class AddTaskScreen extends StatefulWidget {
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  String _category = 'Cá nhân';
+  late String _category;
   int _priority = 1;
   final List<String> _attachments = [];
 
@@ -38,21 +39,67 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   static const Color ghBlue = Color(0xFF0969DA);
 
   Color _bg(bool d) => d ? const Color(0xFF0D1117) : Colors.white;
-  Color _headerBg(bool d) => d ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-  Color _border(bool d) => d ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
+  Color _headerBg(bool d) =>
+      d ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
+  Color _border(bool d) =>
+      d ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
   Color _input(bool d) => d ? const Color(0xFF010409) : Colors.white;
   Color _txt(bool d) => d ? const Color(0xFFC9D1D9) : const Color(0xFF24292F);
   Color _sub(bool d) => d ? const Color(0xFF8B949E) : const Color(0xFF57606A);
+
+  bool _initialTimeResolved = false;
 
   @override
   void initState() {
     super.initState();
     _startTime = widget.initialDate ?? DateTime.now();
     _endTime = _startTime.add(const Duration(hours: 1));
+    // Trong dự án → nhãn mặc định "Công việc". Ngoài dự án → "Cá nhân".
+    _category = widget.projectId != null ? 'Công việc' : 'Cá nhân';
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialTimeResolved) return;
+    _initialTimeResolved = true;
+    // Nếu đây là công việc con của dự án và user không truyền initialDate,
+    // lấy thời gian bắt đầu của dự án làm giờ bắt đầu mặc định.
+    if (widget.initialDate == null && widget.projectId != null) {
+      final provider = context.read<TaskProvider>();
+      final project = provider.projects
+          .where((p) => p.project_id == widget.projectId)
+          .firstOrNull;
+      if (project != null && project.startDate != null) {
+        setState(() {
+          _startTime = project.startDate!;
+          _endTime = _startTime.add(const Duration(hours: 1));
+        });
+      }
+    }
   }
 
   Future<void> _save() async {
-    if (_titleCtrl.text.trim().isEmpty) return;
+    if (_titleCtrl.text.trim().isEmpty) {
+      AppPopup.show(
+        context,
+        title: 'Thiếu dữ liệu',
+        message: 'Vui lòng nhập tiêu đề công việc trước khi lưu.',
+        color: Colors.orange,
+        icon: Icons.warning_amber_rounded,
+      );
+      return;
+    }
+    if (!_endTime.isAfter(_startTime)) {
+      AppPopup.show(
+        context,
+        title: 'Thời gian không hợp lệ',
+        message: 'Giờ kết thúc phải sau giờ bắt đầu.',
+        color: Colors.red,
+        icon: Icons.error_outline_rounded,
+      );
+      return;
+    }
     final user = FirebaseAuth.instance.currentUser;
     final now = DateTime.now();
     final task = Task(
@@ -75,33 +122,47 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     );
 
     final provider = context.read<TaskProvider>();
-    
+
     if (widget.projectId != null) {
-      final project = provider.projects.where((p) => p.project_id == widget.projectId).firstOrNull;
+      final project = provider.projects
+          .where((p) => p.project_id == widget.projectId)
+          .firstOrNull;
       if (project != null && project.startDate != null) {
         if (_startTime.isBefore(project.startDate!)) {
-          final isDarkNow = Provider.of<AppProvider>(context, listen: false).themeMode == ThemeMode.dark;
+          final isDarkNow =
+              Provider.of<AppProvider>(context, listen: false).themeMode ==
+                  ThemeMode.dark;
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               backgroundColor: _bg(isDarkNow),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               title: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Colors.red, size: 24),
+                  const Icon(Icons.error_outline_rounded,
+                      color: Colors.red, size: 24),
                   const SizedBox(width: 8),
-                  Text("Lỗi thời gian", style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: _txt(isDarkNow))),
+                  Text("Lỗi thời gian",
+                      style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.bold, color: _txt(isDarkNow))),
                 ],
               ),
               content: Text(
                 "Thời gian bắt đầu công việc phải trùng hoặc sau thời gian bắt đầu dự án (${DateFormat('dd/MM/yyyy HH:mm').format(project.startDate!)}).",
-                style: GoogleFonts.nunito(color: _txt(isDarkNow), fontSize: 14, height: 1.5),
+                style: GoogleFonts.nunito(
+                    color: _txt(isDarkNow), fontSize: 14, height: 1.5),
               ),
               actions: [
                 ElevatedButton(
                   onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(backgroundColor: ghGreen, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                  child: Text("Đã hiểu", style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: ghGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8))),
+                  child: Text("Đã hiểu",
+                      style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -109,15 +170,20 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           return;
         }
       }
-    } else {
-      final overlappingTask = provider.checkOverlapWithProjectTask(task);
-      if (overlappingTask != null) {
-        final isDarkNow = Provider.of<AppProvider>(context, listen: false).themeMode == ThemeMode.dark;
+
+      // Kiểm tra trùng giờ với công việc khác trong cùng dự án.
+      final sameProjectOverlap =
+          provider.checkOverlapInSameProject(task, widget.projectId!);
+      if (sameProjectOverlap != null) {
+        final isDarkNow =
+            Provider.of<AppProvider>(context, listen: false).themeMode ==
+                ThemeMode.dark;
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: _bg(isDarkNow),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
                 Container(
@@ -126,13 +192,134 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     color: Colors.orange.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 22),
+                  child: const Icon(Icons.warning_amber_rounded,
+                      color: Colors.orange, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    "Trùng giờ trong dự án",
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: _txt(isDarkNow)),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Công việc mới đang trùng thời gian với công việc khác trong dự án:",
+                  style: GoogleFonts.nunito(
+                      fontSize: 14, height: 1.5, color: _txt(isDarkNow)),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.work_outline_rounded,
+                              color: Colors.red, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              sameProjectOverlap.title,
+                              style: GoogleFonts.nunito(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "${DateFormat('dd/MM HH:mm').format(sameProjectOverlap.due_day)} → ${DateFormat('HH:mm').format(sameProjectOverlap.deadline)}",
+                        style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Bạn vẫn muốn thêm công việc này?",
+                  style: GoogleFonts.nunito(
+                      fontSize: 14, height: 1.5, color: _txt(isDarkNow)),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text("Không",
+                    style: GoogleFonts.nunito(
+                        color: Colors.grey, fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text("Có, thêm vào",
+                    style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) return;
+      }
+    } else {
+      final overlappingTask = provider.checkOverlapWithProjectTask(task);
+      if (overlappingTask != null) {
+        final isDarkNow =
+            Provider.of<AppProvider>(context, listen: false).themeMode ==
+                ThemeMode.dark;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: _bg(isDarkNow),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.warning_amber_rounded,
+                      color: Colors.orange, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     "Trùng lịch dự án",
-                    style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 17, color: _txt(isDarkNow)),
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: _txt(isDarkNow)),
                   ),
                 ),
               ],
@@ -143,19 +330,23 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               children: [
                 Text(
                   "Công việc cá nhân của bạn đang trùng với thời gian thực hiện công việc trong dự án:",
-                  style: GoogleFonts.nunito(fontSize: 14, height: 1.5, color: _txt(isDarkNow)),
+                  style: GoogleFonts.nunito(
+                      fontSize: 14, height: 1.5, color: _txt(isDarkNow)),
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.work_outline_rounded, color: Colors.red, size: 16),
+                      const Icon(Icons.work_outline_rounded,
+                          color: Colors.red, size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -173,7 +364,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 const SizedBox(height: 12),
                 Text(
                   "Bạn có muốn thêm công việc này không?",
-                  style: GoogleFonts.nunito(fontSize: 14, height: 1.5, color: _txt(isDarkNow)),
+                  style: GoogleFonts.nunito(
+                      fontSize: 14, height: 1.5, color: _txt(isDarkNow)),
                 ),
               ],
             ),
@@ -182,7 +374,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 onPressed: () => Navigator.pop(ctx, false),
                 child: Text(
                   "Không",
-                  style: GoogleFonts.nunito(color: Colors.grey, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.nunito(
+                      color: Colors.grey, fontWeight: FontWeight.bold),
                 ),
               ),
               ElevatedButton(
@@ -191,7 +384,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: Text(
                   "Có, thêm vào",
@@ -206,12 +400,21 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     }
 
     await provider.addTask(task);
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    Navigator.pop(context);
+    AppPopup.show(
+      context,
+      title: 'Thành công',
+      message: 'Công việc "${task.title}" đã được tạo.',
+      color: ghGreen,
+      icon: Icons.check_circle_rounded,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Provider.of<AppProvider>(context).themeMode == ThemeMode.dark;
+    final isDark =
+        Provider.of<AppProvider>(context).themeMode == ThemeMode.dark;
     final size = MediaQuery.of(context).size;
     final isWeb = MediaQuery.of(context).size.width > 900;
 
@@ -250,18 +453,21 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     if (widget.isDialog) {
       return Dialog(
         backgroundColor: _bg(isDark),
-        insetPadding: EdgeInsets.symmetric(horizontal: isWeb ? size.width * 0.2 : 16, vertical: 24),
+        insetPadding: EdgeInsets.symmetric(
+            horizontal: isWeb ? size.width * 0.2 : 16, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: _border(isDark), width: 1.5),
         ),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: size.height * 0.85, maxWidth: 800),
+          constraints:
+              BoxConstraints(maxHeight: size.height * 0.85, maxWidth: 800),
           child: content,
         ),
       );
     }
-    return Scaffold(backgroundColor: _bg(isDark), body: SafeArea(child: content));
+    return Scaffold(
+        backgroundColor: _bg(isDark), body: SafeArea(child: content));
   }
 
   Widget _buildHeader(bool isDark) {
@@ -270,13 +476,21 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       decoration: BoxDecoration(
         color: _headerBg(isDark),
         border: Border(bottom: BorderSide(color: _border(isDark))),
-        borderRadius: widget.isDialog ? const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)) : null,
+        borderRadius: widget.isDialog
+            ? const BorderRadius.only(
+                topLeft: Radius.circular(16), topRight: Radius.circular(16))
+            : null,
       ),
       child: Row(
         children: [
           Icon(Icons.add_task_rounded, color: ghBlue, size: 26),
           const SizedBox(width: 12),
-          Text("ĐẦU VIỆC MỚI", style: GoogleFonts.nunito(color: _txt(isDark), fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          Text("ĐẦU VIỆC MỚI",
+              style: GoogleFonts.nunito(
+                  color: _txt(isDark),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5)),
           const Spacer(),
           IconButton(
             onPressed: () => Navigator.pop(context),
@@ -290,11 +504,16 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   Widget _buildMetaRow(bool isDark, bool isWeb) {
+    final inProject = widget.projectId != null;
     if (isWeb) {
       return Row(
         children: [
-          Expanded(child: _metaBtn(Icons.label_outline, _category, () => _showCategoryPicker(isDark), isDark)),
-          const SizedBox(width: 12),
+          if (!inProject) ...[
+            Expanded(
+                child: _metaBtn(Icons.label_outline, _category,
+                    () => _showCategoryPicker(isDark), isDark)),
+            const SizedBox(width: 12),
+          ],
           Expanded(child: _buildPrioritySelector(isDark)),
           const SizedBox(width: 12),
           Expanded(child: _buildTimeSelector(isDark)),
@@ -305,8 +524,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: _metaBtn(Icons.label_outline, _category, () => _showCategoryPicker(isDark), isDark)),
-            const SizedBox(width: 12),
+            if (!inProject) ...[
+              Expanded(
+                  child: _metaBtn(Icons.label_outline, _category,
+                      () => _showCategoryPicker(isDark), isDark)),
+              const SizedBox(width: 12),
+            ],
             Expanded(child: _buildPrioritySelector(isDark)),
           ],
         ),
@@ -318,12 +541,20 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   Widget _buildPrioritySelector(bool isDark) {
     String label = _priority == 1 ? "Thấp" : (_priority == 2 ? "Vừa" : "Cao");
-    Color color = _priority == 3 ? Colors.redAccent : (_priority == 2 ? Colors.orange : Colors.blue);
-    return _metaBtn(Icons.flag_outlined, "Ưu tiên: $label", () => _showPriorityPicker(isDark), isDark, labelColor: color);
+    Color color = _priority == 3
+        ? Colors.redAccent
+        : (_priority == 2 ? Colors.orange : Colors.blue);
+    return _metaBtn(Icons.flag_outlined, "Ưu tiên: $label",
+        () => _showPriorityPicker(isDark), isDark,
+        labelColor: color);
   }
 
   Widget _buildTimeSelector(bool isDark) {
-    return _metaBtn(Icons.access_time, "Giờ: ${DateFormat('HH:mm').format(_startTime)} - ${DateFormat('HH:mm').format(_endTime)}", () => _showTimePicker(isDark), isDark);
+    return _metaBtn(
+        Icons.access_time,
+        "Giờ: ${DateFormat('HH:mm').format(_startTime)} - ${DateFormat('HH:mm').format(_endTime)}",
+        () => _showTimePicker(isDark),
+        isDark);
   }
 
   Widget _buildGoldenHourSuggestion(bool isDark) {
@@ -336,7 +567,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     final h1 = hours[0];
     final h2 = hours.length > 1 ? hours[1] : (h1 + 4) % 24;
 
-    final formatHour = (int h) => "${h.toString().padLeft(2, '0')}:00 - ${((h + 1) % 24).toString().padLeft(2, '0')}:00";
+    final formatHour = (int h) =>
+        "${h.toString().padLeft(2, '0')}:00 - ${((h + 1) % 24).toString().padLeft(2, '0')}:00";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -344,14 +576,16 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       decoration: BoxDecoration(
         color: Colors.amber.withValues(alpha: isDark ? 0.1 : 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.4), width: 1.2),
+        border:
+            Border.all(color: Colors.amber.withValues(alpha: 0.4), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.wb_sunny_outlined, color: Colors.amber, size: 20),
+              const Icon(Icons.wb_sunny_outlined,
+                  color: Colors.amber, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -390,7 +624,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     return ActionChip(
       onPressed: () {
         setState(() {
-          _startTime = DateTime(_startTime.year, _startTime.month, _startTime.day, hour, 0);
+          _startTime = DateTime(
+              _startTime.year, _startTime.month, _startTime.day, hour, 0);
           _endTime = _startTime.add(const Duration(hours: 1));
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -418,18 +653,28 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     );
   }
 
-  Widget _metaBtn(IconData icon, String label, VoidCallback onTap, bool isDark, {Color? labelColor}) {
+  Widget _metaBtn(IconData icon, String label, VoidCallback onTap, bool isDark,
+      {Color? labelColor}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: _input(isDark), borderRadius: BorderRadius.circular(10), border: Border.all(color: _border(isDark), width: 1.2)),
+        decoration: BoxDecoration(
+            color: _input(isDark),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _border(isDark), width: 1.2)),
         child: Row(
           children: [
             Icon(icon, color: labelColor ?? ghBlue, size: 20),
             const SizedBox(width: 10),
-            Expanded(child: Text(label, style: GoogleFonts.nunito(color: labelColor ?? _txt(isDark), fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+            Expanded(
+                child: Text(label,
+                    style: GoogleFonts.nunito(
+                        color: labelColor ?? _txt(isDark),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis)),
             Icon(Icons.arrow_drop_down, color: _sub(isDark), size: 20),
           ],
         ),
@@ -441,7 +686,11 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Tiêu đề công việc", style: GoogleFonts.nunito(color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 15)),
+        Text("Tiêu đề công việc",
+            style: GoogleFonts.nunito(
+                color: _txt(isDark),
+                fontWeight: FontWeight.bold,
+                fontSize: 15)),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -452,10 +701,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           ),
           child: TextField(
             controller: _titleCtrl,
-            style: GoogleFonts.nunito(color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 18),
+            style: GoogleFonts.nunito(
+                color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 18),
             decoration: InputDecoration(
               hintText: "Nhập tiêu đề...",
-              hintStyle: GoogleFonts.nunito(color: _sub(isDark).withOpacity(0.5), fontSize: 18),
+              hintStyle: GoogleFonts.nunito(
+                  color: _sub(isDark).withOpacity(0.5), fontSize: 18),
               isDense: true,
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -470,7 +721,11 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Mô tả chi tiết", style: GoogleFonts.nunito(color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 15)),
+        Text("Mô tả chi tiết",
+            style: GoogleFonts.nunito(
+                color: _txt(isDark),
+                fontWeight: FontWeight.bold,
+                fontSize: 15)),
         const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
@@ -488,10 +743,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   controller: _descCtrl,
                   maxLines: null,
                   expands: true,
-                  style: GoogleFonts.nunito(color: _txt(isDark), fontSize: 15, height: 1.5),
+                  style: GoogleFonts.nunito(
+                      color: _txt(isDark), fontSize: 15, height: 1.5),
                   decoration: InputDecoration(
                     hintText: "Thêm ghi chú mô tả của bạn tại đây...",
-                    hintStyle: GoogleFonts.nunito(color: _sub(isDark).withOpacity(0.5)),
+                    hintStyle: GoogleFonts.nunito(
+                        color: _sub(isDark).withOpacity(0.5)),
                     contentPadding: const EdgeInsets.all(16),
                     border: InputBorder.none,
                   ),
@@ -508,12 +765,27 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   Widget _buildAttachmentBar(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(border: Border(top: BorderSide(color: _border(isDark))), color: _headerBg(isDark).withOpacity(0.5)),
+      decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: _border(isDark))),
+          color: _headerBg(isDark).withOpacity(0.5)),
       child: Row(
         children: [
-          Expanded(child: _attachments.isEmpty ? Text('Đính kèm tài liệu...', style: GoogleFonts.nunito(color: _sub(isDark), fontSize: 13)) : SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: _attachments.map((f) => _fileChip(f)).toList()))),
+          Expanded(
+              child: _attachments.isEmpty
+                  ? Text('Đính kèm tài liệu...',
+                      style:
+                          GoogleFonts.nunito(color: _sub(isDark), fontSize: 13))
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                          children:
+                              _attachments.map((f) => _fileChip(f)).toList()))),
           const SizedBox(width: 8),
-          IconButton(onPressed: _pickAttachment, icon: Icon(Icons.attach_file, size: 22, color: ghBlue), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+          IconButton(
+              onPressed: _pickAttachment,
+              icon: Icon(Icons.attach_file, size: 22, color: ghBlue),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints()),
         ],
       ),
     );
@@ -523,8 +795,19 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     return Container(
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: ghBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: ghBlue.withOpacity(0.3))),
-      child: Row(children: [Text(name, style: GoogleFonts.nunito(color: ghBlue, fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(width: 6), InkWell(onTap: () => setState(() => _attachments.remove(name)), child: const Icon(Icons.close, size: 16, color: ghBlue))]),
+      decoration: BoxDecoration(
+          color: ghBlue.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: ghBlue.withOpacity(0.3))),
+      child: Row(children: [
+        Text(name,
+            style: GoogleFonts.nunito(
+                color: ghBlue, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(width: 6),
+        InkWell(
+            onTap: () => setState(() => _attachments.remove(name)),
+            child: const Icon(Icons.close, size: 16, color: ghBlue))
+      ]),
     );
   }
 
@@ -534,15 +817,25 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: _border(isDark))),
         color: _headerBg(isDark),
-        borderRadius: widget.isDialog ? const BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)) : null,
+        borderRadius: widget.isDialog
+            ? const BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16))
+            : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14)),
-            child: Text("HỦY BỎ", style: GoogleFonts.nunito(color: _sub(isDark), fontWeight: FontWeight.bold, fontSize: 15)),
+            style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 14)),
+            child: Text("HỦY BỎ",
+                style: GoogleFonts.nunito(
+                    color: _sub(isDark),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15)),
           ),
           const SizedBox(width: 16),
           ElevatedButton(
@@ -551,10 +844,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               backgroundColor: ghGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: Text("TẠO MỚI", style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 15)),
+            child: Text("TẠO MỚI",
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.bold, fontSize: 15)),
           ),
         ],
       ),
@@ -563,31 +859,53 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   Future<void> _pickAttachment() async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
-    if (result != null) setState(() => _attachments.addAll(result.files.map((e) => e.name)));
+    if (result != null)
+      setState(() => _attachments.addAll(result.files.map((e) => e.name)));
   }
 
   void _showCategoryPicker(bool isDark) {
-    final cats = ['Công việc', 'Cá nhân', 'Học tập', 'Ưu tiên', 'Bug', 'Giao diện'];
+    final cats = [
+      'Công việc',
+      'Cá nhân',
+      'Học tập',
+      'Ưu tiên',
+      'Bug',
+      'Giao diện'
+    ];
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _bg(isDark),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text("Chọn nhãn", textAlign: TextAlign.center, style: GoogleFonts.nunito(color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 20)),
+        title: Text("Chọn nhãn",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+                color: _txt(isDark),
+                fontWeight: FontWeight.bold,
+                fontSize: 20)),
         content: SizedBox(
           width: 320,
           child: Wrap(
             alignment: WrapAlignment.center,
             spacing: 12,
             runSpacing: 12,
-            children: cats.map((c) => ActionChip(
-              label: Text(c, style: GoogleFonts.nunito(fontSize: 15)),
-              onPressed: () { setState(() => _category = c); Navigator.pop(ctx); },
-              backgroundColor: _category == c ? ghBlue : _input(isDark),
-              labelStyle: GoogleFonts.nunito(color: _category == c ? Colors.white : _txt(isDark), fontWeight: FontWeight.bold),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            )).toList(),
+            children: cats
+                .map((c) => ActionChip(
+                      label: Text(c, style: GoogleFonts.nunito(fontSize: 15)),
+                      onPressed: () {
+                        setState(() => _category = c);
+                        Navigator.pop(ctx);
+                      },
+                      backgroundColor: _category == c ? ghBlue : _input(isDark),
+                      labelStyle: GoogleFonts.nunito(
+                          color: _category == c ? Colors.white : _txt(isDark),
+                          fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ))
+                .toList(),
           ),
         ),
       ),
@@ -595,68 +913,234 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   void _showPriorityPicker(bool isDark) {
-    final prios = [{'v': 1, 'l': 'Thấp', 'c': Colors.blue}, {'v': 2, 'l': 'Vừa', 'c': Colors.orange}, {'v': 3, 'l': 'Cao', 'c': Colors.redAccent}];
+    final prios = [
+      {'v': 1, 'l': 'Thấp', 'c': Colors.blue},
+      {'v': 2, 'l': 'Vừa', 'c': Colors.orange},
+      {'v': 3, 'l': 'Cao', 'c': Colors.redAccent}
+    ];
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _bg(isDark),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text("Độ ưu tiên", textAlign: TextAlign.center, style: GoogleFonts.nunito(color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 20)),
+        title: Text("Độ ưu tiên",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+                color: _txt(isDark),
+                fontWeight: FontWeight.bold,
+                fontSize: 20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: prios.map((p) => ListTile(
-            leading: Icon(Icons.flag_rounded, color: p['c'] as Color, size: 26),
-            title: Text(p['l'] as String, style: GoogleFonts.nunito(color: p['c'] as Color, fontWeight: FontWeight.bold, fontSize: 16)),
-            trailing: _priority == p['v'] ? Icon(Icons.check_circle_rounded, color: p['c'] as Color, size: 24) : null,
-            onTap: () { setState(() => _priority = p['v'] as int); Navigator.pop(ctx); },
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          )).toList(),
+          children: prios
+              .map((p) => ListTile(
+                    leading: Icon(Icons.flag_rounded,
+                        color: p['c'] as Color, size: 26),
+                    title: Text(p['l'] as String,
+                        style: GoogleFonts.nunito(
+                            color: p['c'] as Color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16)),
+                    trailing: _priority == p['v']
+                        ? Icon(Icons.check_circle_rounded,
+                            color: p['c'] as Color, size: 24)
+                        : null,
+                    onTap: () {
+                      setState(() => _priority = p['v'] as int);
+                      Navigator.pop(ctx);
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ))
+              .toList(),
         ),
       ),
     );
   }
 
   void _showTimePicker(bool isDark) {
+    // Lấy ràng buộc thời gian từ dự án (nếu có).
+    DateTime? projectStart;
+    DateTime? projectEnd;
+    if (widget.projectId != null) {
+      final provider = context.read<TaskProvider>();
+      final project = provider.projects
+          .where((p) => p.project_id == widget.projectId)
+          .firstOrNull;
+      projectStart = project?.startDate;
+      projectEnd = project?.endDate;
+    }
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _bg(isDark),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Cài đặt thời gian', textAlign: TextAlign.center, style: GoogleFonts.nunito(color: _txt(isDark), fontSize: 20, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _timeTile('Giờ bắt đầu', _startTime, (t) {
-              setState(() {
-                _startTime = DateTime(_startTime.year, _startTime.month, _startTime.day, t.hour, t.minute);
-                // Tự động nhảy giờ kết thúc sang 1 tiếng sau
-                _endTime = _startTime.add(const Duration(hours: 1));
-              });
-            }, isDark),
-            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
-            _timeTile('Giờ kết thúc', _endTime, (t) => setState(() => _endTime = DateTime(_endTime.year, _endTime.month, _endTime.day, t.hour, t.minute)), isDark),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: _bg(isDark),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          title: Text('Cài đặt thời gian',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                  color: _txt(isDark),
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold)),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dateTimeTile('Bắt đầu', _startTime, (dt) {
+                  if (projectStart != null && dt.isBefore(projectStart)) {
+                    AppPopup.show(
+                      context,
+                      title: 'Không hợp lệ',
+                      message:
+                          'Thời gian bắt đầu không được sớm hơn thời gian bắt đầu dự án (${DateFormat('dd/MM/yyyy HH:mm').format(projectStart)}).',
+                      color: Colors.red,
+                      icon: Icons.error_outline_rounded,
+                    );
+                    return;
+                  }
+                  setState(() {
+                    _startTime = dt;
+                    // Tự động nhảy giờ kết thúc sang 1 tiếng sau
+                    _endTime = _startTime.add(const Duration(hours: 1));
+                  });
+                  setDialogState(() {});
+                }, isDark, minDate: projectStart, maxDate: projectEnd),
+                const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Divider()),
+                _dateTimeTile('Kết thúc', _endTime, (dt) {
+                  if (projectStart != null && dt.isBefore(projectStart)) {
+                    AppPopup.show(
+                      context,
+                      title: 'Không hợp lệ',
+                      message:
+                          'Thời gian kết thúc không được sớm hơn thời gian bắt đầu dự án.',
+                      color: Colors.red,
+                      icon: Icons.error_outline_rounded,
+                    );
+                    return;
+                  }
+                  setState(() => _endTime = dt);
+                  setDialogState(() {});
+                }, isDark, minDate: projectStart, maxDate: projectEnd),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('XÁC NHẬN',
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.bold,
+                        color: ghBlue,
+                        fontSize: 15))),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('XÁC NHẬN', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: ghBlue, fontSize: 15))),
-        ],
       ),
     );
   }
 
-  Widget _timeTile(String title, DateTime val, Function(TimeOfDay) onSet, bool isDark) {
-    return ListTile(
-      title: Text(title, style: GoogleFonts.nunito(color: _txt(isDark), fontSize: 15, fontWeight: FontWeight.bold)),
-      subtitle: Text(DateFormat('HH:mm').format(val), style: GoogleFonts.nunito(color: ghBlue, fontSize: 16, fontWeight: FontWeight.bold)),
-      trailing: Icon(Icons.access_time_filled_rounded, color: ghBlue, size: 24),
-      onTap: () async {
-        final t = await showTimePicker(
-          context: context,
-          initialTime: TimeOfDay.fromDateTime(val),
-          builder: (context, child) => Theme(data: Theme.of(context).copyWith(colorScheme: ColorScheme.fromSeed(seedColor: ghBlue)), child: child!),
-        );
-        if (t != null) onSet(t);
-      },
+  Widget _dateTimeTile(
+      String title, DateTime val, Function(DateTime) onSet, bool isDark,
+      {DateTime? minDate, DateTime? maxDate}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(title,
+                style: GoogleFonts.nunito(
+                    color: _txt(isDark),
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold)),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text('Ngày',
+                      style: GoogleFonts.nunito(
+                          color: _txt(isDark).withValues(alpha: 0.6),
+                          fontSize: 12)),
+                  subtitle: Text(DateFormat('dd/MM/yyyy').format(val),
+                      style: GoogleFonts.nunito(
+                          color: ghBlue,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold)),
+                  trailing: Icon(Icons.calendar_today_rounded,
+                      color: ghBlue, size: 20),
+                  onTap: () async {
+                    final first = minDate != null
+                        ? DateTime(minDate.year, minDate.month, minDate.day)
+                        : DateTime(2000);
+                    final last = maxDate != null
+                        ? DateTime(maxDate.year, maxDate.month, maxDate.day)
+                        : DateTime(2100);
+                    final initial = val.isBefore(first)
+                        ? first
+                        : (val.isAfter(last) ? last : val);
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: initial,
+                      firstDate: first,
+                      lastDate: last,
+                      builder: (context, child) => Theme(
+                          data: Theme.of(context).copyWith(
+                              colorScheme:
+                                  ColorScheme.fromSeed(seedColor: ghBlue)),
+                          child: child!),
+                    );
+                    if (d != null) {
+                      onSet(DateTime(
+                          d.year, d.month, d.day, val.hour, val.minute));
+                    }
+                  },
+                ),
+              ),
+              Expanded(
+                child: ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text('Giờ',
+                      style: GoogleFonts.nunito(
+                          color: _txt(isDark).withValues(alpha: 0.6),
+                          fontSize: 12)),
+                  subtitle: Text(DateFormat('HH:mm').format(val),
+                      style: GoogleFonts.nunito(
+                          color: ghBlue,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold)),
+                  trailing: Icon(Icons.access_time_filled_rounded,
+                      color: ghBlue, size: 20),
+                  onTap: () async {
+                    final t = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(val),
+                      builder: (context, child) => Theme(
+                          data: Theme.of(context).copyWith(
+                              colorScheme:
+                                  ColorScheme.fromSeed(seedColor: ghBlue)),
+                          child: child!),
+                    );
+                    if (t != null) {
+                      onSet(DateTime(
+                          val.year, val.month, val.day, t.hour, t.minute));
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -664,17 +1148,23 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     if (widget.projectId == null) return const SizedBox.shrink();
 
     final provider = Provider.of<TaskProvider>(context);
-    final projectTasks = provider.tasks.where((t) => t.project_id == widget.projectId).toList();
+    final projectTasks =
+        provider.tasks.where((t) => t.project_id == widget.projectId).toList();
 
     if (projectTasks.isEmpty) return const SizedBox.shrink();
 
-    final selectedTask = projectTasks.where((t) => t.task_id == _dependencyTaskId).firstOrNull;
+    final selectedTask =
+        projectTasks.where((t) => t.task_id == _dependencyTaskId).firstOrNull;
     final label = selectedTask == null ? "Không có" : selectedTask.title;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Công việc tiên quyết (Bắt buộc hoàn thành trước)", style: GoogleFonts.nunito(color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 15)),
+        Text("Công việc tiên quyết (Bắt buộc hoàn thành trước)",
+            style: GoogleFonts.nunito(
+                color: _txt(isDark),
+                fontWeight: FontWeight.bold,
+                fontSize: 15)),
         const SizedBox(height: 10),
         InkWell(
           onTap: () => _showDependencyPicker(isDark, projectTasks),
@@ -688,7 +1178,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.link_rounded, color: Colors.blueAccent, size: 20),
+                const Icon(Icons.link_rounded,
+                    color: Colors.blueAccent, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -696,7 +1187,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     style: GoogleFonts.nunito(
                       color: selectedTask == null ? _sub(isDark) : _txt(isDark),
                       fontSize: 14,
-                      fontWeight: selectedTask == null ? FontWeight.normal : FontWeight.bold,
+                      fontWeight: selectedTask == null
+                          ? FontWeight.normal
+                          : FontWeight.bold,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -704,7 +1197,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 if (_dependencyTaskId != null) ...[
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.clear, size: 18, color: Colors.redAccent),
+                    icon: const Icon(Icons.clear,
+                        size: 18, color: Colors.redAccent),
                     onPressed: () {
                       setState(() {
                         _dependencyTaskId = null;
@@ -728,7 +1222,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: _bg(isDark),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(16), topRight: Radius.circular(16))),
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
@@ -737,12 +1233,16 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             children: [
               Text(
                 "Chọn công việc tiên quyết",
-                style: GoogleFonts.nunito(color: _txt(isDark), fontWeight: FontWeight.bold, fontSize: 16),
+                style: GoogleFonts.nunito(
+                    color: _txt(isDark),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16),
               ),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.block, color: Colors.grey),
-                title: Text("Không có", style: GoogleFonts.nunito(color: _txt(isDark))),
+                title: Text("Không có",
+                    style: GoogleFonts.nunito(color: _txt(isDark))),
                 onTap: () {
                   setState(() {
                     _dependencyTaskId = null;
@@ -759,17 +1259,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     final isSelected = t.task_id == _dependencyTaskId;
                     return ListTile(
                       leading: Icon(
-                        t.status == 'completed' ? Icons.check_circle_outline : Icons.pending_actions_rounded,
-                        color: t.status == 'completed' ? Colors.green : Colors.blue,
+                        t.status == 'completed'
+                            ? Icons.check_circle_outline
+                            : Icons.pending_actions_rounded,
+                        color: t.status == 'completed'
+                            ? Colors.green
+                            : Colors.blue,
                       ),
                       title: Text(
                         t.title,
                         style: GoogleFonts.nunito(
                           color: _txt(isDark),
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
-                      trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
+                      trailing: isSelected
+                          ? const Icon(Icons.check, color: Colors.blue)
+                          : null,
                       onTap: () {
                         setState(() {
                           _dependencyTaskId = t.task_id;

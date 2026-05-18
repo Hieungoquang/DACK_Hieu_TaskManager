@@ -95,7 +95,8 @@ Lưu ý quan trọng:
           final parts = cleanLine.split('|');
           if (parts.isNotEmpty) {
             // Lấy tiêu đề và làm sạch đầu dòng
-            final title = parts[0].replaceAll(RegExp(r'^[-•*0-9.]+\s*'), '').trim();
+            final title =
+                parts[0].replaceAll(RegExp(r'^[-•*0-9.]+\s*'), '').trim();
             if (title.isEmpty) continue;
 
             int duration = 45;

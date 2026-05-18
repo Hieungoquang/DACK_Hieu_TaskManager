@@ -93,20 +93,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Tính toán tiến độ ngày
     final today = DateTime.now();
-    final todayTasks = provider.tasks.where((t) =>
-        t.due_day.year == today.year &&
-        t.due_day.month == today.month &&
-        t.due_day.day == today.day &&
-        !t.isDeleted).toList();
+    final todayTasks = provider.tasks
+        .where((t) =>
+            t.due_day.year == today.year &&
+            t.due_day.month == today.month &&
+            t.due_day.day == today.day &&
+            !t.isDeleted)
+        .toList();
 
     double dailyProgress = 0.0;
     if (todayTasks.isNotEmpty) {
-      final totalProgress = todayTasks.fold<int>(0, (sum, t) => sum + t.progress);
+      final totalProgress =
+          todayTasks.fold<int>(0, (sum, t) => sum + t.progress);
       dailyProgress = totalProgress / (todayTasks.length * 100);
     }
 
     // Lấy nhiệm vụ đang thực hiện (in_progress)
-    final activeTasks = provider.tasks.where((t) => t.status == 'in_progress' && !t.isDeleted).toList();
+    final activeTasks = provider.tasks
+        .where((t) => t.status == 'in_progress' && !t.isDeleted)
+        .toList();
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -123,15 +128,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildGreeting(isDark, isWeb),
                   const SizedBox(height: 20),
-                  _buildDailyProgressBar(isDark, dailyProgress, todayTasks.length),
+                  _buildDailyProgressBar(
+                      isDark, dailyProgress, todayTasks.length),
                   if (activeTasks.isNotEmpty) ...[
                     const SizedBox(height: 20),
-                    ActiveTaskTrackerWidget(
-                      task: activeTasks.first,
-                      onRefresh: () {
-                        setState(() {});
-                      },
-                    ),
+                    ...activeTasks.map((t) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ActiveTaskTrackerWidget(
+                            task: t,
+                            onRefresh: () {
+                              setState(() {});
+                            },
+                          ),
+                        )),
                   ],
                   const SizedBox(height: 30),
                   _buildCrisisAlerts(isDark, provider),
@@ -243,7 +252,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+            const Icon(Icons.warning_amber_rounded,
+                color: Colors.redAccent, size: 24),
             const SizedBox(width: 8),
             Text(
               "CẢNH BÁO KHỦNG HOẢNG DEADLINE",
@@ -276,7 +286,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.redAccent.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.timer_off, color: Colors.redAccent, size: 20),
+                  child: const Icon(Icons.timer_off,
+                      color: Colors.redAccent, size: 20),
                 ),
                 title: Text(
                   t.title,
@@ -378,7 +389,8 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ProcrastinationReportScreen()),
+          MaterialPageRoute(
+              builder: (_) => const ProcrastinationReportScreen()),
         );
       },
       borderRadius: BorderRadius.circular(12),
@@ -406,7 +418,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.psychology_alt_rounded, color: Colors.purpleAccent, size: 24),
+            Icon(Icons.psychology_alt_rounded,
+                color: Colors.purpleAccent, size: 24),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -417,13 +430,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: GoogleFonts.nunito(
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
-                      color: isDark ? Colors.purpleAccent : const Color(0xFF6B2D8C),
+                      color: isDark
+                          ? Colors.purpleAccent
+                          : const Color(0xFF6B2D8C),
                       letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    "Xem phân tích xu hướng trì hoãn và phản hồi thực tế từ AI Coach.",
+                    "Xem phân tích xu hướng trì hoãn và phản hồi thực tế từ TaskFlow AI.",
                     style: GoogleFonts.nunito(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -531,14 +546,16 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 40),
         _buildSectionHeader("NHIỆM VỤ", null, isDark),
         const SizedBox(height: 16),
-        _buildSearchAndFilterTasks(isDark, textColor, isDark ? ghDarkSubText : ghLightSubText),
+        _buildSearchAndFilterTasks(
+            isDark, textColor, isDark ? ghDarkSubText : ghLightSubText),
         const SizedBox(height: 16),
         _buildRecentTasksList(isDark, provider, borderColor),
       ],
     );
   }
 
-  Widget _buildSearchAndFilterTasks(bool isDark, Color textColor, Color labelColor) {
+  Widget _buildSearchAndFilterTasks(
+      bool isDark, Color textColor, Color labelColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -552,10 +569,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: TextField(
             onChanged: (val) => setState(() => _taskSearchQuery = val),
-            style: GoogleFonts.nunito(color: textColor, fontWeight: FontWeight.bold),
+            style: GoogleFonts.nunito(
+                color: textColor, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               hintText: "Tìm kiếm nhiệm vụ...",
-              hintStyle: GoogleFonts.nunito(color: labelColor.withOpacity(0.5), fontWeight: FontWeight.bold),
+              hintStyle: GoogleFonts.nunito(
+                  color: labelColor.withOpacity(0.5),
+                  fontWeight: FontWeight.bold),
               prefixIcon: Icon(Icons.search, color: labelColor),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -593,13 +613,17 @@ class _HomeScreenState extends State<HomeScreen> {
           color: isSelected ? baseColor.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? baseColor : (isDark ? ghDarkBorder : ghLightBorder),
+            color: isSelected
+                ? baseColor
+                : (isDark ? ghDarkBorder : ghLightBorder),
           ),
         ),
         child: Text(
           label,
           style: GoogleFonts.nunito(
-            color: isSelected ? baseColor : (isDark ? ghDarkSubText : ghLightSubText),
+            color: isSelected
+                ? baseColor
+                : (isDark ? ghDarkSubText : ghLightSubText),
             fontWeight: FontWeight.bold,
             fontSize: 13,
           ),
@@ -732,7 +756,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.calendar_today_outlined, size: 11, color: isDark ? ghDarkSubText : ghLightSubText),
+                  Icon(Icons.calendar_today_outlined,
+                      size: 11, color: isDark ? ghDarkSubText : ghLightSubText),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -765,14 +790,19 @@ class _HomeScreenState extends State<HomeScreen> {
     Color borderColor,
   ) {
     final filteredTasks = provider.tasks.where((t) {
-      final matchSearch = t.title.toLowerCase().contains(_taskSearchQuery.toLowerCase());
-      final matchPriority = _selectedTaskPriority == null || t.priority == _selectedTaskPriority;
+      final matchSearch =
+          t.title.toLowerCase().contains(_taskSearchQuery.toLowerCase());
+      final matchPriority =
+          _selectedTaskPriority == null || t.priority == _selectedTaskPriority;
       return matchSearch && matchPriority;
     }).toList();
 
     // Giới hạn 5 task gần nhất nếu không có tìm kiếm, ngược lại hiển thị kết quả tìm kiếm (tối đa 20)
-    final isFiltering = _taskSearchQuery.isNotEmpty || _selectedTaskPriority != null;
-    final tasks = isFiltering ? filteredTasks.take(20).toList() : filteredTasks.take(5).toList();
+    final isFiltering =
+        _taskSearchQuery.isNotEmpty || _selectedTaskPriority != null;
+    final tasks = isFiltering
+        ? filteredTasks.take(20).toList()
+        : filteredTasks.take(5).toList();
     final cardColor = isDark ? ghDarkCard : Colors.white;
 
     return Container(
@@ -791,11 +821,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   Divider(color: borderColor, height: 1),
               itemBuilder: (context, index) {
                 final t = tasks[index];
-                bool isProject = t.project_id != null && t.project_id!.isNotEmpty;
+                bool isProject =
+                    t.project_id != null && t.project_id!.isNotEmpty;
                 String groupName = t.category;
                 if (isProject) {
                   try {
-                    groupName = provider.projects.firstWhere((p) => p.project_id == t.project_id).name;
+                    groupName = provider.projects
+                        .firstWhere((p) => p.project_id == t.project_id)
+                        .name;
                   } catch (_) {
                     groupName = "Dự án";
                   }
@@ -828,7 +861,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.only(top: 4),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today, size: 12, color: isDark ? ghDarkSubText : ghLightSubText),
+                        Icon(Icons.calendar_today,
+                            size: 12,
+                            color: isDark ? ghDarkSubText : ghLightSubText),
                         const SizedBox(width: 4),
                         Text(
                           "${t.due_day.day} Thg ${t.due_day.month}, ${t.due_day.year}",
@@ -885,8 +920,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMiniCalendar(bool isDark, Color borderColor, TaskProvider provider) {
-    final tasksForSelectedDay = provider.tasks.where((t) => _sameDay(t.due_day, _selectedDay)).toList();
+  Widget _buildMiniCalendar(
+      bool isDark, Color borderColor, TaskProvider provider) {
+    final tasksForSelectedDay =
+        provider.tasks.where((t) => _sameDay(t.due_day, _selectedDay)).toList();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -994,13 +1031,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: isDark ? ghDarkText : ghLightText,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
-                                decoration: t.status == 'completed' ? TextDecoration.lineThrough : null,
+                                decoration: t.status == 'completed'
+                                    ? TextDecoration.lineThrough
+                                    : null,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              t.status == 'completed' ? "Đã xong" : (t.status == 'in_progress' ? "Đang làm" : "Đang chờ"),
+                              t.status == 'completed'
+                                  ? "Đã xong"
+                                  : (t.status == 'in_progress'
+                                      ? "Đang làm"
+                                      : "Đang chờ"),
                               style: GoogleFonts.nunito(
                                 color: isDark ? ghDarkSubText : ghLightSubText,
                                 fontSize: 12,
@@ -1257,16 +1300,18 @@ class _HomeScreenState extends State<HomeScreen> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
-              backgroundColor: isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
+              backgroundColor:
+                  isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
               valueColor: AlwaysStoppedAnimation(ghGreen),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            taskCount > 0 
-                ? "Hôm nay bạn có $taskCount nhiệm vụ được lên lịch." 
+            taskCount > 0
+                ? "Hôm nay bạn có $taskCount nhiệm vụ được lên lịch."
                 : "Hôm nay không có nhiệm vụ nào được lên lịch.",
-            style: GoogleFonts.nunito(fontSize: 12, color: subColor, fontWeight: FontWeight.w600),
+            style: GoogleFonts.nunito(
+                fontSize: 12, color: subColor, fontWeight: FontWeight.w600),
           ),
         ],
       ),

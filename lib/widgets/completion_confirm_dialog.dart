@@ -17,7 +17,8 @@ class CompletionConfirmDialog extends StatefulWidget {
   });
 
   @override
-  State<CompletionConfirmDialog> createState() => _CompletionConfirmDialogState();
+  State<CompletionConfirmDialog> createState() =>
+      _CompletionConfirmDialogState();
 }
 
 class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
@@ -27,7 +28,22 @@ class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
   @override
   void initState() {
     super.initState();
-    _progress = widget.task.progress.toDouble();
+    // Tự động gợi ý tiến độ dựa trên thời gian đã trôi qua / tổng thời lượng.
+    final now = DateTime.now();
+    final total =
+        widget.task.deadline.difference(widget.task.due_day).inSeconds;
+    final elapsed = now.difference(widget.task.due_day).inSeconds;
+    double suggested;
+    if (total <= 0) {
+      suggested = widget.task.progress.toDouble();
+    } else {
+      suggested = (elapsed / total * 100).clamp(0, 100).toDouble();
+      // Làm tròn về nấc 25% để gợi ý sạch sẽ.
+      suggested = (suggested / 25).round() * 25.0;
+    }
+    // Ưu tiên tiến độ hiện tại nếu đã có (>0), không đè bằng gợi ý nhỏ hơn.
+    final current = widget.task.progress.toDouble();
+    _progress = current > suggested ? current : suggested;
   }
 
   @override
@@ -55,9 +71,11 @@ class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ghGreen = const Color(0xFF3FB950);
     final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textColor = isDark ? const Color(0xFFC9D1D9) : const Color(0xFF24292F);
+    final textColor =
+        isDark ? const Color(0xFFC9D1D9) : const Color(0xFF24292F);
     final subText = isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final borderColor = isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
+    final borderColor =
+        isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
 
     return Dialog(
       backgroundColor: cardBg,
@@ -105,26 +123,46 @@ class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: _getProgressColor(_progress),
-                  thumbColor: _getProgressColor(_progress),
-                  inactiveTrackColor: borderColor,
-                  valueIndicatorColor: _getProgressColor(_progress),
-                ),
-                child: Slider(
-                  value: _progress,
-                  min: 0,
-                  max: 100,
-                  divisions: 20,
-                  label: "${_progress.toInt()}%",
-                  onChanged: (val) {
-                    setState(() {
-                      _progress = val;
-                    });
-                  },
+              // Thanh tiến độ hiển thị (không kéo).
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: _progress / 100,
+                  minHeight: 10,
+                  backgroundColor: borderColor,
+                  valueColor:
+                      AlwaysStoppedAnimation(_getProgressColor(_progress)),
                 ),
               ),
+              const SizedBox(height: 12),
+              // Các nhãn chọn nhanh thay cho slider.
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [0, 25, 50, 75, 100].map((p) {
+                  final selected = _progress.toInt() == p;
+                  final color = _getProgressColor(p.toDouble());
+                  return ChoiceChip(
+                    selected: selected,
+                    onSelected: (_) => setState(() => _progress = p.toDouble()),
+                    label: Text(
+                      "$p%",
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w800,
+                        color: selected ? Colors.white : color,
+                      ),
+                    ),
+                    selectedColor: color,
+                    backgroundColor: color.withOpacity(0.12),
+                    side: BorderSide(color: color.withOpacity(0.4)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 8),
               Center(
                 child: Text(
                   _getProgressLabel(_progress),
@@ -150,9 +188,13 @@ class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
                 maxLines: 3,
                 style: GoogleFonts.nunito(color: textColor, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: "Ghi nhận khó khăn, bài học hoặc kết quả thực tế...",
-                  hintStyle: GoogleFonts.nunito(color: subText.withOpacity(0.6), fontSize: 13),
-                  fillColor: isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
+                  hintText:
+                      "Ghi nhận khó khăn, bài học hoặc kết quả thực tế...",
+                  hintStyle: GoogleFonts.nunito(
+                      color: subText.withOpacity(0.6), fontSize: 13),
+                  fillColor: isDark
+                      ? const Color(0xFF0D1117)
+                      : const Color(0xFFF6F8FA),
                   filled: true,
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -183,7 +225,7 @@ class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
                     onPressed: () async {
                       final now = DateTime.now();
                       final task = widget.task;
-                      
+
                       // 1. Cập nhật tiến độ của task
                       task.progress = _progress.toInt();
                       if (_progress == 100.0) {
@@ -207,8 +249,8 @@ class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
                         start_time: start,
                         end_time: end,
                         duration_minutes: duration <= 0 ? 1 : duration,
-                        notes: _notesController.text.trim().isEmpty 
-                            ? "Cập nhật tiến độ thành ${_progress.toInt()}%" 
+                        notes: _notesController.text.trim().isEmpty
+                            ? "Cập nhật tiến độ thành ${_progress.toInt()}%"
                             : _notesController.text.trim(),
                         created_at: now,
                         updated_at: now,
@@ -217,18 +259,20 @@ class _CompletionConfirmDialogState extends State<CompletionConfirmDialog> {
 
                       // 4. Gọi callbacks tải lại dữ liệu trong TaskProvider
                       if (context.mounted) {
-                        Provider.of<TaskProvider>(context, listen: false).loadTasks();
+                        Provider.of<TaskProvider>(context, listen: false)
+                            .loadTasks();
                       }
 
                       widget.onConfirm();
-                      
+
                       if (context.mounted) {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
                               "Đã lưu kết quả hoàn thành: ${_progress.toInt()}%",
-                              style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+                              style: GoogleFonts.nunito(
+                                  fontWeight: FontWeight.bold),
                             ),
                             backgroundColor: ghGreen,
                           ),

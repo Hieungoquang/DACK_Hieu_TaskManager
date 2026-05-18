@@ -40,12 +40,47 @@ class TaskProvider extends ChangeNotifier {
   DateTime? _startTime;
   StreamSubscription<QuerySnapshot>? _notifSubscription;
 
+  Timer? _autoStatusTimer;
+
+  TaskProvider() {
+    // Mỗi 30 giây, tự động chuyển những công việc tới giờ sang "đang làm"
+    // (phòng trường hợp người dùng quên đặt trạng thái).
+    _autoStatusTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      autoStartDueTasks();
+    });
+  }
+
+  /// Tự động set status='in_progress' cho các task đang ở trong khung giờ
+  /// thực hiện (now ∈ [due_day, deadline]) nhưng vẫn còn 'pending'.
+  void autoStartDueTasks() {
+    final now = DateTime.now();
+    bool changed = false;
+    for (var t in _tasks) {
+      if (t.isDeleted) continue;
+      if (t.status != 'pending') continue;
+      if (now.isAfter(t.due_day) && now.isBefore(t.deadline)) {
+        t.status = 'in_progress';
+        t.updatedAt = now;
+        t.isSynced = false;
+        try {
+          t.save();
+        } catch (_) {}
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
   Map<String, double> _crisisProbabilities = {};
   Map<String, double> get crisisProbabilities => _crisisProbabilities;
   final Set<String> _warnedCrisisTasks = {};
 
   List<Task> get crisisTasks {
-    return tasks.where((t) => _crisisProbabilities.containsKey(t.task_id) && _crisisProbabilities[t.task_id]! >= 0.7).toList();
+    return tasks
+        .where((t) =>
+            _crisisProbabilities.containsKey(t.task_id) &&
+            _crisisProbabilities[t.task_id]! >= 0.7)
+        .toList();
   }
 
   List<int> getGoldenHours() {
@@ -59,7 +94,8 @@ class TaskProvider extends ChangeNotifier {
     double delayRate = PredictionService.calculateDelayRate(allTasks);
     for (var task in tasks) {
       if (task.status != 'completed' && !task.isDeleted) {
-        final project = _projects.where((p) => p.project_id == task.project_id).firstOrNull;
+        final project =
+            _projects.where((p) => p.project_id == task.project_id).firstOrNull;
         double prob = PredictionService.calculateCrisisProbability(
           task,
           delayRate,
@@ -68,10 +104,10 @@ class TaskProvider extends ChangeNotifier {
         );
         if (prob > 0) {
           _crisisProbabilities[task.task_id] = prob;
-          
+
           if (prob >= 0.7 && !_warnedCrisisTasks.contains(task.task_id)) {
-             _warnedCrisisTasks.add(task.task_id);
-             _triggerCrisisNotification(task, prob);
+            _warnedCrisisTasks.add(task.task_id);
+            _triggerCrisisNotification(task, prob);
           }
         }
       }
@@ -83,7 +119,8 @@ class TaskProvider extends ChangeNotifier {
     await NotificationService.showNotification(
       id: task.task_id.hashCode.abs() + 999, // Unique ID for crisis
       title: '🚨 Cảnh báo Khủng hoảng Deadline',
-      body: 'Công việc "${task.title}" có nguy cơ trễ hạn rất cao ($percent%). Hãy xử lý ngay!',
+      body:
+          'Công việc "${task.title}" có nguy cơ trễ hạn rất cao ($percent%). Hãy xử lý ngay!',
     );
   }
 
@@ -106,6 +143,7 @@ class TaskProvider extends ChangeNotifier {
 
     _rescheduleAll();
     _calculateCrisisProbabilities();
+    autoStartDueTasks();
     notifyListeners();
 
     try {
@@ -244,34 +282,34 @@ class TaskProvider extends ChangeNotifier {
         )
         .snapshots()
         .listen((snapshot) async {
-          for (var change in snapshot.docChanges) {
-            if (change.type == DocumentChangeType.added) {
-              final data = change.doc.data() as Map<String, dynamic>;
-              final notifId = data['notification_id'];
-              if (!LocalService.notificationExists(notifId)) {
-                final newNotif = notif_model.Notification(
-                  notification_id: notifId,
-                  user_id: uid,
-                  task_id: data['task_id'] ?? "",
-                  title: data['title'] ?? "Thông báo mới",
-                  message: data['message'] ?? "",
-                  type: data['type'] ?? "general",
-                  scheduled_at: DateTime.parse(data['scheduled_at']),
-                  isRead: false,
-                  created_at: DateTime.parse(data['created_at']),
-                  updated_at: DateTime.parse(data['updated_at']),
-                );
-                await LocalService.addNotification(newNotif);
-                NotificationService.showNotification(
-                  id: notifId.hashCode.abs(),
-                  title: newNotif.title,
-                  body: newNotif.message,
-                );
-                notifyListeners();
-              }
-            }
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data() as Map<String, dynamic>;
+          final notifId = data['notification_id'];
+          if (!LocalService.notificationExists(notifId)) {
+            final newNotif = notif_model.Notification(
+              notification_id: notifId,
+              user_id: uid,
+              task_id: data['task_id'] ?? "",
+              title: data['title'] ?? "Thông báo mới",
+              message: data['message'] ?? "",
+              type: data['type'] ?? "general",
+              scheduled_at: DateTime.parse(data['scheduled_at']),
+              isRead: false,
+              created_at: DateTime.parse(data['created_at']),
+              updated_at: DateTime.parse(data['updated_at']),
+            );
+            await LocalService.addNotification(newNotif);
+            NotificationService.showNotification(
+              id: notifId.hashCode.abs(),
+              title: newNotif.title,
+              body: newNotif.message,
+            );
+            notifyListeners();
           }
-        });
+        }
+      }
+    });
   }
 
   Future<void> sendCloudNotification({
@@ -290,21 +328,23 @@ class TaskProvider extends ChangeNotifier {
         .collection('notifications')
         .doc(notifId)
         .set({
-          'notification_id': notifId,
-          'user_id': targetUserId,
-          'task_id': taskId,
-          'title': title,
-          'message': message,
-          'type': type,
-          'scheduled_at': now.toIso8601String(),
-          'isRead': false,
-          'created_at': now.toIso8601String(),
-          'updated_at': now.toIso8601String(),
-        });
+      'notification_id': notifId,
+      'user_id': targetUserId,
+      'task_id': taskId,
+      'title': title,
+      'message': message,
+      'type': type,
+      'scheduled_at': now.toIso8601String(),
+      'isRead': false,
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    });
   }
 
   @override
   void dispose() {
+    _autoStatusTimer?.cancel();
+    _globalTimer?.cancel();
     _notifSubscription?.cancel();
     super.dispose();
   }
@@ -366,16 +406,17 @@ class TaskProvider extends ChangeNotifier {
 
   Color getTaskColor(Task task) {
     // 1. Công việc thuộc dự án: Mặc định Đỏ
-    if (task.project_id != null && task.project_id!.isNotEmpty) return Colors.red;
-    
+    if (task.project_id != null && task.project_id!.isNotEmpty)
+      return Colors.red;
+
     // 2. Công việc thuộc nhóm cá nhân: Lấy màu của nhóm
     if (task.categoryId != null && task.categoryId!.isNotEmpty) {
       try {
         final cat = _categories.firstWhere((c) => c.id == task.categoryId);
         return Color(cat.colorValue);
-      } catch (_) { }
+      } catch (_) {}
     }
-    
+
     // 3. Mặc định (GitHub Blue)
     return const Color(0xFF58A6FF);
   }
@@ -391,7 +432,8 @@ class TaskProvider extends ChangeNotifier {
   Future<void> updateProject(Project project) async {
     project.updatedAt = DateTime.now();
     await LocalService.updateProject(project);
-    final index = _projects.indexWhere((p) => p.project_id == project.project_id);
+    final index =
+        _projects.indexWhere((p) => p.project_id == project.project_id);
     if (index != -1) {
       _projects[index] = project;
     }
@@ -412,8 +454,10 @@ class TaskProvider extends ChangeNotifier {
       task.isDeleted = true;
       task.updatedAt = DateTime.now();
       await task.save();
-      await NotificationService.cancelNotification(_getNotificationId(task.task_id));
-      await NotificationService.cancelNotification(_getNotificationId(task.task_id) + 1);
+      await NotificationService.cancelNotification(
+          _getNotificationId(task.task_id));
+      await NotificationService.cancelNotification(
+          _getNotificationId(task.task_id) + 1);
     }
 
     notifyListeners();
@@ -441,7 +485,8 @@ class TaskProvider extends ChangeNotifier {
   }
 
   Future<void> permanentlyDeleteProject(String id) async {
-    final tasksToDelete = _tasks.where((t) => t.project_id == id).map((t) => t.task_id).toList();
+    final tasksToDelete =
+        _tasks.where((t) => t.project_id == id).map((t) => t.task_id).toList();
     await LocalService.deleteProject(id);
     _projects.removeWhere((p) => p.project_id == id);
     _tasks.removeWhere((t) => t.project_id == id);
@@ -457,13 +502,15 @@ class TaskProvider extends ChangeNotifier {
     if (user == null) return false;
 
     try {
-      final docRef = FirebaseFirestore.instance.collection('projects').doc(projectId);
+      final docRef =
+          FirebaseFirestore.instance.collection('projects').doc(projectId);
       final doc = await docRef.get();
       if (!doc.exists) return false;
 
       final data = doc.data() as Map<String, dynamic>;
       final memberIds = List<String>.from(data['memberIds'] ?? []);
-      final memberStatuses = Map<String, String>.from(data['memberStatuses'] ?? {});
+      final memberStatuses =
+          Map<String, String>.from(data['memberStatuses'] ?? {});
 
       if (!memberIds.contains(user.uid)) {
         memberIds.add(user.uid);
@@ -489,7 +536,8 @@ class TaskProvider extends ChangeNotifier {
       );
 
       await LocalService.addProject(project);
-      final index = _projects.indexWhere((p) => p.project_id == project.project_id);
+      final index =
+          _projects.indexWhere((p) => p.project_id == project.project_id);
       if (index == -1) {
         _projects.add(project);
       } else {
@@ -527,7 +575,8 @@ class TaskProvider extends ChangeNotifier {
   }
 
   Future<void> updateTask(Task task) async {
-    final wasCompleted = _tasks.any((t) => t.task_id == task.task_id && t.status == 'completed');
+    final wasCompleted =
+        _tasks.any((t) => t.task_id == task.task_id && t.status == 'completed');
     final isCompleted = task.status == 'completed';
 
     task.updatedAt = DateTime.now();
@@ -678,7 +727,8 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Time_logs> getLogsByTask(String taskId) => LocalService.getLogsByTask(taskId);
+  List<Time_logs> getLogsByTask(String taskId) =>
+      LocalService.getLogsByTask(taskId);
 
   Task? checkOverlapWithProjectTask(Task newTask) {
     final startA = newTask.due_day;
@@ -696,26 +746,50 @@ class TaskProvider extends ChangeNotifier {
     return null;
   }
 
+  /// Tìm task khác trong CÙNG dự án có thời gian trùng với [newTask].
+  Task? checkOverlapInSameProject(Task newTask, String projectId) {
+    final startA = newTask.due_day;
+    final endA = newTask.deadline;
+    for (var t in tasks) {
+      if (t.isDeleted) continue;
+      if (t.task_id == newTask.task_id) continue;
+      if (t.project_id != projectId) continue;
+      final startB = t.due_day;
+      final endB = t.deadline;
+      if (startA.isBefore(endB) && endA.isAfter(startB)) {
+        return t;
+      }
+    }
+    return null;
+  }
+
   // --- Task Dependency & Automation Helpers ---
 
   bool isTaskLocked(Task task) {
-    if (task.dependencyTaskId == null || task.dependencyTaskId!.isEmpty) return false;
-    final prereq = _tasks.where((t) => t.task_id == task.dependencyTaskId && !t.isDeleted).firstOrNull;
+    if (task.dependencyTaskId == null || task.dependencyTaskId!.isEmpty)
+      return false;
+    final prereq = _tasks
+        .where((t) => t.task_id == task.dependencyTaskId && !t.isDeleted)
+        .firstOrNull;
     if (prereq == null) return false;
     return prereq.status != 'completed';
   }
 
   Task? getPrerequisiteTask(Task task) {
-    if (task.dependencyTaskId == null || task.dependencyTaskId!.isEmpty) return null;
-    return _tasks.where((t) => t.task_id == task.dependencyTaskId && !t.isDeleted).firstOrNull;
+    if (task.dependencyTaskId == null || task.dependencyTaskId!.isEmpty)
+      return null;
+    return _tasks
+        .where((t) => t.task_id == task.dependencyTaskId && !t.isDeleted)
+        .firstOrNull;
   }
 
   List<Task> getPrerequisiteCandidates(Task currentTask) {
-    final projectTasks = tasks.where((t) => 
-      t.project_id == currentTask.project_id && 
-      t.task_id != currentTask.task_id
-    ).toList();
-    
+    final projectTasks = tasks
+        .where((t) =>
+            t.project_id == currentTask.project_id &&
+            t.task_id != currentTask.task_id)
+        .toList();
+
     final validCandidates = <Task>[];
     for (var task in projectTasks) {
       if (!_isDependentOn(task, currentTask.task_id)) {
@@ -726,28 +800,33 @@ class TaskProvider extends ChangeNotifier {
   }
 
   bool _isDependentOn(Task task, String targetTaskId) {
-    if (task.dependencyTaskId == null || task.dependencyTaskId!.isEmpty) return false;
+    if (task.dependencyTaskId == null || task.dependencyTaskId!.isEmpty)
+      return false;
     if (task.dependencyTaskId == targetTaskId) return true;
-    final parent = _tasks.where((t) => t.task_id == task.dependencyTaskId && !t.isDeleted).firstOrNull;
+    final parent = _tasks
+        .where((t) => t.task_id == task.dependencyTaskId && !t.isDeleted)
+        .firstOrNull;
     if (parent == null) return false;
     return _isDependentOn(parent, targetTaskId);
   }
 
-  void _checkAndNotifyUnlockedTasks(String completedTaskId, String completedTaskTitle) async {
-    final unlockedTasks = tasks.where((t) => 
-      t.dependencyTaskId == completedTaskId && 
-      !isTaskLocked(t)
-    ).toList();
+  void _checkAndNotifyUnlockedTasks(
+      String completedTaskId, String completedTaskTitle) async {
+    final unlockedTasks = tasks
+        .where((t) => t.dependencyTaskId == completedTaskId && !isTaskLocked(t))
+        .toList();
 
     for (var task in unlockedTasks) {
       final notifTitle = '🔓 Khóa chuỗi công việc được mở';
-      final notifBody = 'Công việc "${task.title}" đã được mở khóa vì "${completedTaskTitle}" đã hoàn thành!';
+      final notifBody =
+          'Công việc "${task.title}" đã được mở khóa vì "${completedTaskTitle}" đã hoàn thành!';
       await NotificationService.showNotification(
         id: task.task_id.hashCode.abs() + 2000,
         title: notifTitle,
         body: notifBody,
       );
-      await _saveNotificationToDb(notifTitle, notifBody, 'task_unlocked', taskId: task.task_id);
+      await _saveNotificationToDb(notifTitle, notifBody, 'task_unlocked',
+          taskId: task.task_id);
     }
   }
 }
